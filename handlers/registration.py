@@ -181,23 +181,12 @@ async def step_smoking(call: CallbackQuery, state: FSMContext) -> None:
 async def step_pets(call: CallbackQuery, state: FSMContext) -> None:
     key = call.data.split(":", 1)[1]
     await state.update_data(pets=texts.PETS[key])
-    await state.set_state(Form.schedule)
-    await call.message.edit_text(texts.ASK_SCHEDULE, reply_markup=inline.schedule_kb())
-    await call.answer()
-
-
-# ====================== ШАГ 10 — РЕЖИМ ЖИЗНИ ======================
-
-@router.callback_query(Form.schedule, F.data.startswith("sched:"))
-async def step_schedule(call: CallbackQuery, state: FSMContext) -> None:
-    key = call.data.split(":", 1)[1]
-    await state.update_data(schedule=texts.SCHEDULE[key])
     await state.set_state(Form.occupation)
     await call.message.edit_text(texts.ASK_OCCUPATION, reply_markup=inline.occupation_kb())
     await call.answer()
 
 
-# ====================== ШАГ 11 — ЗАНЯТОСТЬ ======================
+# ====================== ШАГ 10 — ЗАНЯТОСТЬ ======================
 
 @router.callback_query(Form.occupation, F.data.startswith("occ:"))
 async def step_occupation(call: CallbackQuery, state: FSMContext) -> None:
@@ -208,7 +197,7 @@ async def step_occupation(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
 
 
-# ====================== ШАГ 12 — ФОТО ======================
+# ====================== ШАГ 11 — ФОТО ======================
 
 @router.message(Form.photo, F.photo)
 async def step_photo(message: Message, state: FSMContext) -> None:
@@ -227,7 +216,7 @@ async def step_photo_skip(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
 
 
-# ====================== ШАГ 13 — О СЕБЕ ======================
+# ====================== ШАГ 12 — О СЕБЕ ======================
 
 @router.message(Form.about, F.text)
 async def step_about(message: Message, state: FSMContext) -> None:
@@ -246,7 +235,7 @@ async def step_about_skip(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
 
 
-# ====================== ШАГ 14 — ПОКАЗ АНКЕТЫ ======================
+# ====================== ШАГ 13 — ПОКАЗ АНКЕТЫ ======================
 
 async def _show_profile_card(message: Message, state: FSMContext) -> None:
     """Собрать данные и показать карточку с кнопками сохранить/заново."""
@@ -299,7 +288,6 @@ async def confirm_restart(call: CallbackQuery, state: FSMContext) -> None:
 @router.message(Form.move_in)
 @router.message(Form.smoking)
 @router.message(Form.pets)
-@router.message(Form.schedule)
 @router.message(Form.occupation)
 async def wrong_input_button(message: Message) -> None:
     await message.answer(texts.PRESS_BUTTON)

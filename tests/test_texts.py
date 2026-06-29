@@ -31,7 +31,6 @@ def _sample_user(**overrides):
         "move_in": "🔥 Срочно, сейчас",
         "smoking": "Нет",
         "pets": "❌ Нет",
-        "schedule": "🦉 Сова",
         "occupation": "🎓 Студент/ка",
         "about": "Тихая, дома редко",
     }

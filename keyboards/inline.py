@@ -76,11 +76,6 @@ def pets_kb() -> InlineKeyboardMarkup:
     return _kb_from_dict("pets", texts.PETS, width=1)
 
 
-def schedule_kb() -> InlineKeyboardMarkup:
-    """Шаг 10 — режим жизни."""
-    return _kb_from_dict("sched", texts.SCHEDULE, width=1)
-
-
 def occupation_kb() -> InlineKeyboardMarkup:
     """Шаг 11 — занятость."""
     return _kb_from_dict("occ", texts.OCCUPATION, width=1)
@@ -134,7 +129,6 @@ EDIT_FIELDS = {
     "move_in": "Когда нужно",
     "smoking": "Курение",
     "pets": "Животные",
-    "schedule": "Режим жизни",
     "occupation": "Занятость",
     "about": "О себе",
 }

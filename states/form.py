@@ -19,8 +19,7 @@ class Form(StatesGroup):
     move_in = State()           # Шаг 7 — когда нужно
     smoking = State()           # Шаг 8 — курение
     pets = State()              # Шаг 9 — животные
-    schedule = State()          # Шаг 10 — режим жизни
-    occupation = State()        # Шаг 11 — занятость
+    occupation = State()        # Шаг 10 — занятость
     photo = State()             # Шаг 12 — фото
     about = State()             # Шаг 13 — о себе
     confirm = State()           # Шаг 14 — подтверждение анкеты

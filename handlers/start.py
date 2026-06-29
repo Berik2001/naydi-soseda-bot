@@ -6,7 +6,10 @@
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, InputMediaPhoto, Message
+
+# Максимум фото квартиры (как в регистрации)
+MAX_APARTMENT_PHOTOS = 10
 
 import texts
 from database.db import get_user, set_active, update_field
@@ -54,34 +57,50 @@ async def cmd_help(message: Message) -> None:
 
 @router.message(Command("profile"))
 async def cmd_profile(message: Message, state: FSMContext) -> None:
-    """Показать меню действий с анкетой."""
+    """Показать полную анкету/объявление и меню действий."""
     user = await get_user(message.from_user.id)
     if user is None:
         await message.answer(texts.NO_PROFILE)
         return
     await state.clear()
-    await message.answer(texts.PROFILE_MENU_TITLE, reply_markup=inline.profile_menu_kb())
+    await send_full_card(message, user)
+    await message.answer(
+        texts.PROFILE_MENU_TITLE, reply_markup=inline.profile_menu_kb(user["role"])
+    )
 
 
-async def _send_profile_card(message: Message, user) -> None:
-    """Отправить карточку анкеты (с фото, если есть)."""
-    card = texts.profile_card(user)
-    if user["photo_file_id"]:
-        await message.answer_photo(photo=user["photo_file_id"], caption=card)
+async def send_full_card(message: Message, user) -> None:
+    """Показать полную карточку: объявление (с альбомом) для provider, иначе анкету."""
+    if user["role"] == "provider":
+        photos = user["apartment_photos"] or []
+        if photos:
+            media = [InputMediaPhoto(media=fid) for fid in photos]
+            await message.answer_media_group(media)
+        await message.answer(texts.listing_card(user))
+    elif user["photo_file_id"]:
+        await message.answer_photo(
+            photo=user["photo_file_id"], caption=texts.profile_card(user)
+        )
     else:
-        await message.answer(card)
+        await message.answer(texts.profile_card(user))
 
 
 # ---------- Пункты меню «Моя анкета» ----------
 
-@router.callback_query(F.data == "profile:view")
-async def profile_view(call: CallbackQuery) -> None:
-    """👀 Смотреть анкету."""
+@router.callback_query(F.data == "profile:feed")
+async def profile_feed(call: CallbackQuery) -> None:
+    """👀 Лента: объявления (ищущим) / анкеты (сдающим)."""
     user = await get_user(call.from_user.id)
     if user is None:
         await call.message.answer(texts.NO_PROFILE)
-    else:
-        await _send_profile_card(call.message, user)
+        await call.answer()
+        return
+    if not user["is_active"]:
+        await call.message.answer(texts.SEARCH_PAUSED)
+        await call.answer()
+        return
+    from handlers.matching import start_search
+    await start_search(call.message, user)
     await call.answer()
 
 
@@ -98,6 +117,48 @@ async def profile_budget(call: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(Edit.waiting_value)
     await state.update_data(edit_field="budget")
     await call.message.answer(texts.ASK_BUDGET)
+    await call.answer()
+
+
+# ---------- Изменение фото квартиры (provider) ----------
+
+@router.callback_query(F.data == "profile:apt_photos")
+async def profile_apt_photos(call: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(Edit.waiting_apartment_photos)
+    await state.update_data(apt_photos=[])
+    await call.message.answer(
+        texts.ASK_APARTMENT_PHOTOS, reply_markup=inline.apartment_photos_done_kb()
+    )
+    await call.answer()
+
+
+@router.message(Edit.waiting_apartment_photos, F.photo)
+async def edit_apt_photo(message: Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    photos = list(data.get("apt_photos") or [])
+    if len(photos) >= MAX_APARTMENT_PHOTOS:
+        await message.answer(
+            texts.APARTMENT_PHOTOS_MAX, reply_markup=inline.apartment_photos_done_kb()
+        )
+        return
+    photos.append(message.photo[-1].file_id)
+    await state.update_data(apt_photos=photos)
+    await message.answer(
+        texts.apartment_photo_added(len(photos)),
+        reply_markup=inline.apartment_photos_done_kb(),
+    )
+
+
+@router.callback_query(Edit.waiting_apartment_photos, F.data == "aptphoto:done")
+async def edit_apt_photos_done(call: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    photos = data.get("apt_photos") or []
+    if not photos:
+        await call.answer(texts.APARTMENT_PHOTOS_NEED_ONE, show_alert=True)
+        return
+    await update_field(call.from_user.id, "apartment_photos", photos)
+    await state.clear()
+    await call.message.answer(texts.PHOTO_UPDATED)
     await call.answer()
 
 

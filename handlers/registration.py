@@ -8,13 +8,21 @@
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, InputMediaPhoto, Message
 
 import texts
-from database.db import get_user, upsert_user
+from database.db import upsert_user
 from keyboards import inline
 from states.form import Form
 from validators import is_valid_about, parse_budget
+
+# Максимум фото квартиры в объявлении
+MAX_APARTMENT_PHOTOS = 10
+
+
+def _is_provider(data: dict) -> bool:
+    """Роль «сдаёт/имеет жильё»?"""
+    return data.get("role") == "provider"
 
 router = Router()
 
@@ -53,19 +61,12 @@ async def step_gender(call: CallbackQuery, state: FSMContext) -> None:
 @router.callback_query(Form.goal, F.data.startswith("goal:"))
 async def step_goal(call: CallbackQuery, state: FSMContext) -> None:
     key = call.data.split(":", 1)[1]
-    await state.update_data(goal=texts.GOAL[key])  # сохраняем текстом
-
-    if key == "have_place":
-        # Быстрый путь для «есть жильё»: пол + цель + город -> сразу карточки.
-        # Предпочтение по полу по умолчанию «неважно», район/бюджет не спрашиваем.
-        await state.update_data(fast_path=True, preferred_gender="any")
-        await state.set_state(Form.city)
-        await call.message.edit_text(texts.ASK_CITY, reply_markup=inline.city_kb())
-    else:
-        await state.set_state(Form.preferred_gender)
-        await call.message.edit_text(
-            texts.ASK_PREFERRED_GENDER, reply_markup=inline.preferred_gender_kb()
-        )
+    # Сохраняем цель текстом и роль (seeker / provider)
+    await state.update_data(goal=texts.GOAL[key], role=texts.GOAL_ROLE[key])
+    await state.set_state(Form.preferred_gender)
+    await call.message.edit_text(
+        texts.ASK_PREFERRED_GENDER, reply_markup=inline.preferred_gender_kb()
+    )
     await call.answer()
 
 
@@ -93,11 +94,7 @@ async def step_city(call: CallbackQuery, state: FSMContext) -> None:
         return
 
     await state.update_data(city=value)
-    data = await state.get_data()
-    if data.get("fast_path"):
-        await _finish_fast_path(call.message, state, call.from_user)
-    else:
-        await _ask_district(call.message, state, value, edit=True)
+    await _ask_district(call.message, state, value, edit=True)
     await call.answer()
 
 
@@ -105,28 +102,7 @@ async def step_city(call: CallbackQuery, state: FSMContext) -> None:
 async def step_city_custom(message: Message, state: FSMContext) -> None:
     city = message.text.strip()
     await state.update_data(city=city)
-    data = await state.get_data()
-    if data.get("fast_path"):
-        await _finish_fast_path(message, state, message.from_user)
-    else:
-        await _ask_district(message, state, city, edit=False)
-
-
-async def _finish_fast_path(message: Message, state: FSMContext, from_user) -> None:
-    """Сохранить минимальную анкету («есть жильё») и сразу показать кандидатов."""
-    data = await state.get_data()
-    data["telegram_id"] = from_user.id
-    data["username"] = from_user.username
-    data["full_name"] = from_user.full_name
-    # Незаполненные поля (район, бюджет, привычки, фото, о себе) уйдут как NULL
-    await upsert_user(data)
-    await state.clear()
-    await message.answer(texts.FAST_PATH_SAVED)
-
-    # Локальный импорт, чтобы не создавать циклических зависимостей
-    from handlers.matching import start_search
-    viewer = await get_user(from_user.id)
-    await start_search(message, viewer)
+    await _ask_district(message, state, city, edit=False)
 
 
 async def _ask_district(message: Message, state: FSMContext, city: str, edit: bool):
@@ -159,19 +135,28 @@ async def step_district(call: CallbackQuery, state: FSMContext) -> None:
         return
 
     await state.update_data(district=value)
-    await state.set_state(Form.budget)
-    await call.message.edit_text(texts.ASK_BUDGET)
+    await _ask_budget_or_price(call.message, state, edit=True)
     await call.answer()
 
 
 @router.message(Form.district_custom, F.text)
 async def step_district_custom(message: Message, state: FSMContext) -> None:
     await state.update_data(district=message.text.strip())
+    await _ask_budget_or_price(message, state, edit=False)
+
+
+async def _ask_budget_or_price(message: Message, state: FSMContext, edit: bool) -> None:
+    """Шаг 6 — спросить бюджет (ищу) или цену аренды (сдаю)."""
+    data = await state.get_data()
+    prompt = texts.ASK_PRICE if _is_provider(data) else texts.ASK_BUDGET
     await state.set_state(Form.budget)
-    await message.answer(texts.ASK_BUDGET)
+    if edit:
+        await message.edit_text(prompt)
+    else:
+        await message.answer(prompt)
 
 
-# ====================== ШАГ 6 — БЮДЖЕТ ======================
+# ====================== ШАГ 6 — БЮДЖЕТ / ЦЕНА ======================
 
 @router.message(Form.budget, F.text)
 async def step_budget(message: Message, state: FSMContext) -> None:
@@ -182,8 +167,72 @@ async def step_budget(message: Message, state: FSMContext) -> None:
         return
 
     await state.update_data(budget=amount)
-    await state.set_state(Form.move_in)
-    await message.answer(texts.ASK_MOVE_IN, reply_markup=inline.move_in_kb())
+    data = await state.get_data()
+    if _is_provider(data):
+        # Сдаю/есть жильё -> загрузка фото квартиры
+        await state.update_data(apartment_photos=[])
+        await state.set_state(Form.apartment_photos)
+        await message.answer(
+            texts.ASK_APARTMENT_PHOTOS, reply_markup=inline.apartment_photos_done_kb()
+        )
+    else:
+        await state.set_state(Form.move_in)
+        await message.answer(texts.ASK_MOVE_IN, reply_markup=inline.move_in_kb())
+
+
+# ====================== ОБЪЯВЛЕНИЕ: ФОТО КВАРТИРЫ (сдаю) ======================
+
+@router.message(Form.apartment_photos, F.photo)
+async def step_apartment_photo(message: Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    photos = list(data.get("apartment_photos") or [])
+    if len(photos) >= MAX_APARTMENT_PHOTOS:
+        await message.answer(
+            texts.APARTMENT_PHOTOS_MAX, reply_markup=inline.apartment_photos_done_kb()
+        )
+        return
+    photos.append(message.photo[-1].file_id)
+    await state.update_data(apartment_photos=photos)
+    await message.answer(
+        texts.apartment_photo_added(len(photos)),
+        reply_markup=inline.apartment_photos_done_kb(),
+    )
+
+
+@router.callback_query(Form.apartment_photos, F.data == "aptphoto:done")
+async def step_apartment_photos_done(call: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    if not (data.get("apartment_photos") or []):
+        await call.answer(texts.APARTMENT_PHOTOS_NEED_ONE, show_alert=True)
+        return
+    await state.set_state(Form.listing_about)
+    await call.message.answer(texts.ASK_LISTING_DESC, reply_markup=inline.skip_about_kb())
+    await call.answer()
+
+
+@router.message(Form.apartment_photos)
+async def step_apartment_photos_wrong(message: Message) -> None:
+    await message.answer(texts.ASK_APARTMENT_PHOTOS,
+                         reply_markup=inline.apartment_photos_done_kb())
+
+
+# ====================== ОБЪЯВЛЕНИЕ: ОПИСАНИЕ (сдаю) ======================
+
+@router.message(Form.listing_about, F.text)
+async def step_listing_about(message: Message, state: FSMContext) -> None:
+    text = message.text.strip()
+    if not is_valid_about(text):
+        await message.answer(texts.ABOUT_TOO_LONG)
+        return
+    await state.update_data(about=text)
+    await _show_card_preview(message, state)
+
+
+@router.callback_query(Form.listing_about, F.data == "skip:about")
+async def step_listing_about_skip(call: CallbackQuery, state: FSMContext) -> None:
+    await state.update_data(about=None)
+    await _show_card_preview(call.message, state)
+    await call.answer()
 
 
 # ====================== ШАГ 7 — КОГДА НУЖНО ======================
@@ -258,33 +307,38 @@ async def step_about(message: Message, state: FSMContext) -> None:
         await message.answer(texts.ABOUT_TOO_LONG)
         return
     await state.update_data(about=text)
-    await _show_profile_card(message, state)
+    await _show_card_preview(message, state)
 
 
 @router.callback_query(Form.about, F.data == "skip:about")
 async def step_about_skip(call: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(about=None)
-    await _show_profile_card(call.message, state)
+    await _show_card_preview(call.message, state)
     await call.answer()
 
 
-# ====================== ШАГ 13 — ПОКАЗ АНКЕТЫ ======================
+# ====================== ПОКАЗ КАРТОЧКИ/ОБЪЯВЛЕНИЯ ======================
 
-async def _show_profile_card(message: Message, state: FSMContext) -> None:
-    """Собрать данные и показать карточку с кнопками сохранить/заново."""
+async def _show_card_preview(message: Message, state: FSMContext) -> None:
+    """Собрать данные и показать карточку (анкету или объявление) с кнопками."""
     data = await state.get_data()
-    # Карточка строится тем же помощником, что и /profile
-    card = texts.profile_card(data)
     await state.set_state(Form.confirm)
 
-    if data.get("photo_file_id"):
+    if _is_provider(data):
+        # Объявление: альбом фото квартиры + текст
+        photos = data.get("apartment_photos") or []
+        if photos:
+            media = [InputMediaPhoto(media=fid) for fid in photos]
+            await message.answer_media_group(media)
+        await message.answer(texts.listing_card(data), reply_markup=inline.confirm_kb())
+    elif data.get("photo_file_id"):
         await message.answer_photo(
             photo=data["photo_file_id"],
-            caption=card,
+            caption=texts.profile_card(data),
             reply_markup=inline.confirm_kb(),
         )
     else:
-        await message.answer(card, reply_markup=inline.confirm_kb())
+        await message.answer(texts.profile_card(data), reply_markup=inline.confirm_kb())
 
 
 @router.callback_query(Form.confirm, F.data == "confirm:save")

@@ -74,13 +74,13 @@ async def upsert_user(data: dict) -> None:
                 telegram_id, username, full_name, gender, goal,
                 preferred_gender, city, district, budget, move_in,
                 smoking, pets, occupation, photo_file_id,
-                about, is_active
+                about, role, apartment_photos, is_active
             )
             VALUES (
                 $1, $2, $3, $4, $5,
                 $6, $7, $8, $9, $10,
                 $11, $12, $13, $14, $15,
-                TRUE
+                $16, $17, TRUE
             )
             ON CONFLICT (telegram_id) DO UPDATE SET
                 username = EXCLUDED.username,
@@ -97,6 +97,8 @@ async def upsert_user(data: dict) -> None:
                 occupation = EXCLUDED.occupation,
                 photo_file_id = EXCLUDED.photo_file_id,
                 about = EXCLUDED.about,
+                role = EXCLUDED.role,
+                apartment_photos = EXCLUDED.apartment_photos,
                 is_active = TRUE
             """,
             data["telegram_id"], data.get("username"), data.get("full_name"),
@@ -105,6 +107,7 @@ async def upsert_user(data: dict) -> None:
             data.get("move_in"), data.get("smoking"), data.get("pets"),
             data.get("occupation"),
             data.get("photo_file_id"), data.get("about"),
+            data.get("role"), data.get("apartment_photos"),
         )
 
 
@@ -117,6 +120,7 @@ async def update_field(telegram_id: int, field: str, value) -> None:
         "gender", "goal", "preferred_gender", "city", "district",
         "budget", "move_in", "smoking", "pets",
         "occupation", "photo_file_id", "about",
+        "role", "apartment_photos",
     }
     if field not in allowed:
         raise ValueError(f"Недопустимое поле: {field}")
@@ -160,6 +164,13 @@ async def get_next_candidate(viewer: asyncpg.Record) -> asyncpg.Record | None:
     else:
         budget_min, budget_max = 0, 2_147_483_647
     pref = viewer["preferred_gender"]
+    # Показываем противоположную роль: ищущим — объявления (provider),
+    # сдающим — анкеты (seeker). Если роль неизвестна — показываем всех.
+    opposite = None
+    if viewer["role"] == "seeker":
+        opposite = "provider"
+    elif viewer["role"] == "provider":
+        opposite = "seeker"
 
     async with pool.acquire() as conn:
         return await conn.fetchrow(
@@ -171,6 +182,8 @@ async def get_next_candidate(viewer: asyncpg.Record) -> asyncpg.Record | None:
               AND ($3 = 'any' OR u.gender = $3)
               -- кандидаты без указанного бюджета (есть жильё) показываются всем
               AND (u.budget IS NULL OR u.budget BETWEEN $4 AND $5)
+              -- противоположная роль (если у смотрящего роль задана)
+              AND ($6::text IS NULL OR u.role = $6)
               AND NOT EXISTS (
                     SELECT 1 FROM views v
                     WHERE v.viewer_id = $1 AND v.viewed_id = u.telegram_id
@@ -180,7 +193,8 @@ async def get_next_candidate(viewer: asyncpg.Record) -> asyncpg.Record | None:
                      u.created_at DESC
             LIMIT 1
             """,
-            viewer["telegram_id"], viewer["city"], pref, budget_min, budget_max,
+            viewer["telegram_id"], viewer["city"], pref,
+            budget_min, budget_max, opposite,
         )
 
 

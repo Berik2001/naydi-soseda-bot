@@ -15,7 +15,9 @@ class Form(StatesGroup):
     city_custom = State()       # Шаг 4 — ввод другого города текстом
     district = State()          # Шаг 5 — район (кнопки)
     district_custom = State()   # Шаг 5 — ввод другого района текстом
-    budget = State()            # Шаг 6 — бюджет (текст)
+    budget = State()            # Шаг 6 — бюджет (ищу) / цена аренды (сдаю)
+    apartment_photos = State()  # сдаю: фото квартиры (до 10)
+    listing_about = State()     # сдаю: описание объявления
     move_in = State()           # Шаг 7 — когда нужно
     smoking = State()           # Шаг 8 — курение
     pets = State()              # Шаг 9 — животные
@@ -29,5 +31,6 @@ class Edit(StatesGroup):
     """Состояния редактирования отдельных полей анкеты."""
     waiting_value = State()         # ждём новое текстовое значение (город/район/бюджет/о себе)
     waiting_photo = State()         # ждём новое фото профиля
+    waiting_apartment_photos = State()  # пересбор фото квартиры (сдаю)
     waiting_loc_city = State()      # ждём текстовый ввод города (через меню анкеты)
     waiting_loc_district = State()  # ждём текстовый ввод района (через меню анкеты)

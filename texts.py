@@ -45,6 +45,23 @@ ASK_CITY_CUSTOM = "✍️ Напиши название города:"
 ASK_DISTRICT = "Укажи район:"
 ASK_DISTRICT_CUSTOM = "✍️ Напиши название района:"
 ASK_BUDGET = "💰 Укажи свой бюджет в месяц:\n(Например: до 100000)"
+# Объявление (сдаю / есть жильё)
+ASK_PRICE = "💰 Укажи цену аренды в месяц:\n(Например: 150000)"
+ASK_APARTMENT_PHOTOS = (
+    "📸 Пришли фото квартиры (по одному, до 10 штук).\n"
+    "Когда закончишь — нажми «Готово ✅»."
+)
+ASK_LISTING_DESC = (
+    "✍️ Опиши жильё:\n"
+    "(Например: 2 комнаты, есть мебель, рядом метро, можно с животными)\n"
+    "Максимум 200 символов"
+)
+APARTMENT_PHOTOS_MAX = "📸 Достигнут максимум — 10 фото. Нажми «Готово ✅»."
+APARTMENT_PHOTOS_NEED_ONE = "🙏 Добавь хотя бы одно фото квартиры."
+
+
+def apartment_photo_added(n: int) -> str:
+    return f"📸 Фото {n}/10 добавлено. Пришли ещё или нажми «Готово ✅»."
 ASK_BUDGET_RETRY = (
     "🚫 Не понял сумму.\n"
     "Укажи сумму от 10 000 до 5 000 000.\n"
@@ -166,6 +183,15 @@ GOAL = {
     "have_place": "🤝 Есть жильё, ищу с кем жить",
 }
 
+# Роль пользователя по выбранной цели:
+#  seeker   — ищет жильё (анкета о себе)
+#  provider — сдаёт / имеет жильё (объявление с фото квартиры)
+GOAL_ROLE = {
+    "search": "seeker",
+    "rent_out": "provider",
+    "have_place": "provider",
+}
+
 MOVE_IN = {
     "urgent": "🔥 Срочно, сейчас",
     "2weeks": "📅 В течение 2 недель",
@@ -246,3 +272,28 @@ def profile_card(user: dict) -> str:
     lines.append(f"💬 «{user['about'] or '—'}»")
 
     return "\n".join(lines)
+
+
+def listing_card(user: dict) -> str:
+    """Карточка объявления (для роли provider — сдаёт/имеет жильё)."""
+    name = user["full_name"] or "Без имени"
+    gender = GENDER.get(user["gender"], "—")
+
+    lines = ["🏠 Сдаётся жильё", "", f"👤 {name}, {gender}"]
+    if user["district"]:
+        lines.append(f"📍 {user['city']}, {user['district']}")
+    elif user["city"]:
+        lines.append(f"📍 {user['city']}")
+    if user["preferred_gender"]:
+        lines.append(f"🤝 Сожитель: {PREFERRED_GENDER.get(user['preferred_gender'], '—')}")
+    if user["budget"]:
+        lines.append(f"💰 {format_budget(user['budget'])}/мес")
+    lines.append(f"💬 «{user['about'] or '—'}»")
+    return "\n".join(lines)
+
+
+def user_card(user: dict) -> str:
+    """Единая точка: для provider — объявление, иначе — анкета."""
+    if user["role"] == "provider":
+        return listing_card(user)
+    return profile_card(user)

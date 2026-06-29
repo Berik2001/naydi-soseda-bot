@@ -6,6 +6,8 @@
 Например: "gender:female", "city:Алматы", "like:123456".
 """
 
+from __future__ import annotations  # поддержка "X | None" на Python 3.9
+
 from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -118,16 +120,28 @@ def match_kb(candidate_id: int) -> InlineKeyboardMarkup:
 
 # ====================== МЕНЮ «МОЯ АНКЕТА» (/profile) ======================
 
-def profile_menu_kb() -> InlineKeyboardMarkup:
-    """Меню действий с анкетой."""
+def profile_menu_kb(role: str | None) -> InlineKeyboardMarkup:
+    """Меню действий с анкетой. Первая кнопка и «фото» зависят от роли."""
     builder = InlineKeyboardBuilder()
-    builder.button(text="👀 Смотреть анкету", callback_data="profile:view")
-    builder.button(text="🔄 Заполнить заново", callback_data="profile:restart")
-    builder.button(text="📸 Изменить фото", callback_data="profile:photo")
+    if role == "provider":
+        builder.button(text="👀 Смотреть анкеты", callback_data="profile:feed")
+        builder.button(text="🔄 Заполнить заново", callback_data="profile:restart")
+        builder.button(text="📸 Изменить фото квартиры", callback_data="profile:apt_photos")
+    else:
+        builder.button(text="👀 Смотреть объявления", callback_data="profile:feed")
+        builder.button(text="🔄 Заполнить заново", callback_data="profile:restart")
+        builder.button(text="📸 Изменить фото", callback_data="profile:photo")
     builder.button(text="💰 Изменить цену", callback_data="profile:budget")
     builder.button(text="📍 Изменить город/район", callback_data="profile:location")
     builder.button(text="⭐ Активировать премиум", callback_data="profile:premium")
     builder.adjust(1)
+    return builder.as_markup()
+
+
+def apartment_photos_done_kb() -> InlineKeyboardMarkup:
+    """Кнопка завершения загрузки фото квартиры."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Готово ✅", callback_data="aptphoto:done")
     return builder.as_markup()
 
 

@@ -83,3 +83,32 @@ def test_profile_card_minimal_have_place():
     assert "📍 Алматы" in card
     assert "None" not in card      # пустые поля не протекают как "None"
     assert "тг" not in card        # строки бюджета нет
+
+
+def test_listing_card_provider():
+    """Карточка объявления (сдаёт жильё)."""
+    user = {
+        "role": "provider",
+        "full_name": "Хост",
+        "gender": "male",
+        "city": "Астана",
+        "district": "Есиль",
+        "preferred_gender": "female",
+        "budget": 150000,
+        "about": "2 комнаты, есть мебель",
+    }
+    card = texts.listing_card(user)
+    assert card.startswith("🏠 Сдаётся жильё")
+    assert "Астана, Есиль" in card
+    assert "150 000 тг/мес" in card
+    assert "2 комнаты, есть мебель" in card
+    assert "👩 Только с девушкой" in card
+
+
+def test_user_card_dispatch_by_role():
+    """user_card выбирает объявление для provider и анкету для seeker."""
+    provider = {
+        "role": "provider", "full_name": "Х", "gender": "male", "city": "Алматы",
+        "district": None, "preferred_gender": "any", "budget": 120000, "about": None,
+    }
+    assert texts.user_card(provider).startswith("🏠 Сдаётся жильё")

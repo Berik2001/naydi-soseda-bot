@@ -116,6 +116,41 @@ def match_kb(candidate_id: int) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+# ====================== МЕНЮ «МОЯ АНКЕТА» (/profile) ======================
+
+def profile_menu_kb() -> InlineKeyboardMarkup:
+    """Меню действий с анкетой."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="👀 Смотреть анкету", callback_data="profile:view")
+    builder.button(text="🔄 Заполнить заново", callback_data="profile:restart")
+    builder.button(text="📸 Изменить фото", callback_data="profile:photo")
+    builder.button(text="💰 Изменить цену", callback_data="profile:budget")
+    builder.button(text="📍 Изменить город/район", callback_data="profile:location")
+    builder.button(text="⭐ Активировать премиум", callback_data="profile:premium")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def profile_city_kb() -> InlineKeyboardMarkup:
+    """Выбор города при редактировании через меню анкеты."""
+    builder = InlineKeyboardBuilder()
+    for city in texts.CITIES:
+        builder.button(text=city, callback_data=f"pcity:{city}")
+    builder.button(text="Другой город ✍️", callback_data="pcity:other")
+    builder.adjust(2)
+    return builder.as_markup()
+
+
+def profile_district_kb(city: str) -> InlineKeyboardMarkup:
+    """Выбор района при редактировании через меню анкеты (зависит от города)."""
+    builder = InlineKeyboardBuilder()
+    for district in texts.DISTRICTS.get(city, []):
+        builder.button(text=district, callback_data=f"pdist:{district}")
+    builder.button(text="Другой ✍️", callback_data="pdist:other")
+    builder.adjust(2)
+    return builder.as_markup()
+
+
 # ====================== РЕДАКТИРОВАНИЕ ======================
 
 # Какие поля можно редактировать и как (text — ввод текста, остальное — клавиатура)

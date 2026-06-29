@@ -53,18 +53,145 @@ async def cmd_help(message: Message) -> None:
 # ====================== /profile ======================
 
 @router.message(Command("profile"))
-async def cmd_profile(message: Message) -> None:
-    """Показать свою анкету."""
+async def cmd_profile(message: Message, state: FSMContext) -> None:
+    """Показать меню действий с анкетой."""
     user = await get_user(message.from_user.id)
     if user is None:
         await message.answer(texts.NO_PROFILE)
         return
+    await state.clear()
+    await message.answer(texts.PROFILE_MENU_TITLE, reply_markup=inline.profile_menu_kb())
 
+
+async def _send_profile_card(message: Message, user) -> None:
+    """Отправить карточку анкеты (с фото, если есть)."""
     card = texts.profile_card(user)
     if user["photo_file_id"]:
         await message.answer_photo(photo=user["photo_file_id"], caption=card)
     else:
         await message.answer(card)
+
+
+# ---------- Пункты меню «Моя анкета» ----------
+
+@router.callback_query(F.data == "profile:view")
+async def profile_view(call: CallbackQuery) -> None:
+    """👀 Смотреть анкету."""
+    user = await get_user(call.from_user.id)
+    if user is None:
+        await call.message.answer(texts.NO_PROFILE)
+    else:
+        await _send_profile_card(call.message, user)
+    await call.answer()
+
+
+@router.callback_query(F.data == "profile:restart")
+async def profile_restart(call: CallbackQuery, state: FSMContext) -> None:
+    """🔄 Заполнить анкету заново."""
+    await start_registration(call.message, state, call.from_user)
+    await call.answer()
+
+
+@router.callback_query(F.data == "profile:budget")
+async def profile_budget(call: CallbackQuery, state: FSMContext) -> None:
+    """💰 Изменить цену — переиспользуем общий поток текстового редактирования."""
+    await state.set_state(Edit.waiting_value)
+    await state.update_data(edit_field="budget")
+    await call.message.answer(texts.ASK_BUDGET)
+    await call.answer()
+
+
+@router.callback_query(F.data == "profile:premium")
+async def profile_premium(call: CallbackQuery) -> None:
+    """⭐ Премиум (заглушка — платежи ещё не подключены)."""
+    await call.message.answer(texts.PREMIUM_INFO)
+    await call.answer()
+
+
+# ---------- Изменение фото ----------
+
+@router.callback_query(F.data == "profile:photo")
+async def profile_photo(call: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(Edit.waiting_photo)
+    await call.message.answer(texts.ASK_NEW_PHOTO)
+    await call.answer()
+
+
+@router.message(Edit.waiting_photo, F.photo)
+async def profile_photo_set(message: Message, state: FSMContext) -> None:
+    file_id = message.photo[-1].file_id
+    await update_field(message.from_user.id, "photo_file_id", file_id)
+    await state.clear()
+    await message.answer(texts.PHOTO_UPDATED)
+
+
+@router.message(Edit.waiting_photo)
+async def profile_photo_wrong(message: Message) -> None:
+    await message.answer(texts.SEND_PHOTO_PLEASE)
+
+
+# ---------- Изменение города / района ----------
+
+@router.callback_query(F.data == "profile:location")
+async def profile_location(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    await call.message.answer(texts.ASK_CITY, reply_markup=inline.profile_city_kb())
+    await call.answer()
+
+
+async def _ask_profile_district(call: CallbackQuery, state: FSMContext, city: str) -> None:
+    """Спросить район: кнопками для Алматы/Астаны, текстом — для остальных."""
+    if city in texts.DISTRICTS:
+        await state.set_state(None)  # район выберется кнопкой (pdist), отдельное состояние не нужно
+        await call.message.edit_text(
+            texts.ASK_DISTRICT, reply_markup=inline.profile_district_kb(city)
+        )
+    else:
+        await state.set_state(Edit.waiting_loc_district)
+        await call.message.edit_text(texts.ASK_DISTRICT_CUSTOM)
+
+
+@router.callback_query(F.data.startswith("pcity:"))
+async def profile_city_set(call: CallbackQuery, state: FSMContext) -> None:
+    value = call.data.split(":", 1)[1]
+    if value == "other":
+        await state.set_state(Edit.waiting_loc_city)
+        await call.message.edit_text(texts.ASK_CITY_CUSTOM)
+        await call.answer()
+        return
+    await update_field(call.from_user.id, "city", value)
+    await _ask_profile_district(call, state, value)
+    await call.answer()
+
+
+@router.message(Edit.waiting_loc_city, F.text)
+async def profile_city_text(message: Message, state: FSMContext) -> None:
+    city = message.text.strip()
+    await update_field(message.from_user.id, "city", city)
+    # Для произвольного города район вводится текстом
+    await state.set_state(Edit.waiting_loc_district)
+    await message.answer(texts.ASK_DISTRICT_CUSTOM)
+
+
+@router.callback_query(F.data.startswith("pdist:"))
+async def profile_district_set(call: CallbackQuery, state: FSMContext) -> None:
+    value = call.data.split(":", 1)[1]
+    if value == "other":
+        await state.set_state(Edit.waiting_loc_district)
+        await call.message.edit_text(texts.ASK_DISTRICT_CUSTOM)
+        await call.answer()
+        return
+    await update_field(call.from_user.id, "district", value)
+    await state.clear()
+    await call.message.edit_text(texts.PROFILE_UPDATED)
+    await call.answer()
+
+
+@router.message(Edit.waiting_loc_district, F.text)
+async def profile_district_text(message: Message, state: FSMContext) -> None:
+    await update_field(message.from_user.id, "district", message.text.strip())
+    await state.clear()
+    await message.answer(texts.PROFILE_UPDATED)
 
 
 # ====================== /pause и /resume ======================

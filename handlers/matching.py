@@ -32,12 +32,18 @@ async def cmd_search(message: Message) -> None:
     if not viewer["is_active"]:
         await message.answer(texts.SEARCH_PAUSED)
         return
+    await start_search(message, viewer)
 
+
+async def start_search(message: Message, viewer) -> None:
+    """Показать первого кандидата (или сообщить, что подходящих нет).
+
+    Используется командой /search и быстрым путём регистрации «есть жильё».
+    """
     candidate = await get_next_candidate(viewer)
     if candidate is None:
         await message.answer(texts.SEARCH_EMPTY)
         return
-
     await _send_candidate(message, candidate)
 
 

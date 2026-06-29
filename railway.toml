@@ -1,0 +1,11 @@
+# Конфигурация деплоя для Railway.
+# Бот работает через long polling, поэтому это worker-процесс без портов.
+
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "python bot.py"
+# Перезапускать бота при падении (до 10 раз), чтобы он не «умирал» от разовых ошибок сети.
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10

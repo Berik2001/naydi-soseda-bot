@@ -10,7 +10,7 @@ from __future__ import annotations  # поддержка синтаксиса "X
 
 import asyncpg
 
-from database.models import ALL_TABLES
+from database.models import ALL_TABLES, MIGRATIONS
 from validators import budget_range
 
 # Глобальный пул соединений
@@ -39,10 +39,13 @@ def get_pool() -> asyncpg.Pool:
 
 
 async def init_db() -> None:
-    """Создать все таблицы, если их ещё нет."""
+    """Создать все таблицы, если их ещё нет, и применить миграции."""
     pool = get_pool()
     async with pool.acquire() as conn:
         for query in ALL_TABLES:
+            await conn.execute(query)
+        # Идемпотентные миграции схемы (ADD COLUMN IF NOT EXISTS и т.п.)
+        for query in MIGRATIONS:
             await conn.execute(query)
 
 
@@ -166,7 +169,9 @@ async def get_next_candidate(viewer: asyncpg.Record) -> asyncpg.Record | None:
                     SELECT 1 FROM views v
                     WHERE v.viewer_id = $1 AND v.viewed_id = u.telegram_id
               )
-            ORDER BY u.created_at DESC
+            -- Премиум-анкеты показываем первыми
+            ORDER BY (u.premium_until IS NOT NULL AND u.premium_until > now()) DESC,
+                     u.created_at DESC
             LIMIT 1
             """,
             viewer["telegram_id"], viewer["city"], pref, budget_min, budget_max,
@@ -210,3 +215,62 @@ async def has_like(from_id: int, to_id: int) -> bool:
             from_id, to_id,
         )
         return row is not None
+
+
+# ====================== ПРЕМИУМ ======================
+
+async def is_premium(telegram_id: int) -> bool:
+    """Активен ли премиум у пользователя (с учётом срока действия)."""
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchval(
+            "SELECT (premium_until IS NOT NULL AND premium_until > now()) "
+            "FROM users WHERE telegram_id = $1",
+            telegram_id,
+        )
+        return bool(row)
+
+
+async def activate_premium(telegram_id: int, days: int) -> None:
+    """
+    Активировать/продлить премиум на `days` дней.
+    Если премиум ещё активен — срок наращивается поверх текущего.
+    """
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            UPDATE users
+            SET is_premium = TRUE,
+                premium_until = GREATEST(COALESCE(premium_until, now()), now())
+                                + make_interval(days => $2)
+            WHERE telegram_id = $1
+            """,
+            telegram_id, days,
+        )
+
+
+async def get_premium_until(telegram_id: int):
+    """Вернуть дату окончания премиума (или None)."""
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetchval(
+            "SELECT premium_until FROM users WHERE telegram_id = $1", telegram_id
+        )
+
+
+async def who_liked_me(telegram_id: int, limit: int = 20) -> list:
+    """Список активных пользователей, которые лайкнули меня (премиум-фича)."""
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetch(
+            """
+            SELECT u.*, l.is_super, l.created_at AS liked_at
+            FROM likes l
+            JOIN users u ON u.telegram_id = l.from_id
+            WHERE l.to_id = $1 AND u.is_active = TRUE
+            ORDER BY l.created_at DESC
+            LIMIT $2
+            """,
+            telegram_id, limit,
+        )

@@ -101,13 +101,6 @@ async def profile_budget(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
 
 
-@router.callback_query(F.data == "profile:premium")
-async def profile_premium(call: CallbackQuery) -> None:
-    """⭐ Премиум (заглушка — платежи ещё не подключены)."""
-    await call.message.answer(texts.PREMIUM_INFO)
-    await call.answer()
-
-
 # ---------- Изменение фото ----------
 
 @router.callback_query(F.data == "profile:photo")

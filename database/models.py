@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS users (
     photo_file_id   TEXT,
     about           TEXT,
     is_active       BOOLEAN DEFAULT TRUE,
+    is_premium      BOOLEAN DEFAULT FALSE,
+    premium_until   TIMESTAMP,
     created_at      TIMESTAMP DEFAULT NOW()
 );
 """
@@ -52,3 +54,10 @@ CREATE TABLE IF NOT EXISTS likes (
 """
 
 ALL_TABLES = [CREATE_USERS, CREATE_VIEWS, CREATE_LIKES]
+
+# Идемпотентные миграции — применяются при каждом старте (ADD COLUMN IF NOT EXISTS).
+# Позволяют доезжать изменениям схемы на уже существующую БД без ручного ALTER.
+MIGRATIONS = [
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_until TIMESTAMP",
+]

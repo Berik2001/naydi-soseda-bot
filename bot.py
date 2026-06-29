@@ -17,7 +17,7 @@ from aiogram.types import BotCommand
 from dotenv import load_dotenv
 
 from database.db import close_pool, create_pool
-from handlers import matching, registration, start
+from handlers import matching, premium, registration, start
 
 # Загружаем переменные окружения из .env
 load_dotenv()
@@ -39,6 +39,7 @@ async def set_commands(bot: Bot) -> None:
         BotCommand(command="profile", description="Моя анкета"),
         BotCommand(command="edit", description="Изменить анкету"),
         BotCommand(command="search", description="Найти сожителей"),
+        BotCommand(command="premium", description="⭐ Премиум"),
         BotCommand(command="pause", description="Скрыть анкету"),
         BotCommand(command="resume", description="Показать анкету"),
         BotCommand(command="help", description="Помощь"),
@@ -65,6 +66,7 @@ async def main() -> None:
     dp.include_router(registration.router)
     dp.include_router(start.router)
     dp.include_router(matching.router)
+    dp.include_router(premium.router)
 
     await set_commands(bot)
 

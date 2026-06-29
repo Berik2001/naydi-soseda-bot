@@ -151,6 +151,22 @@ def profile_district_kb(city: str) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+# ====================== ПРЕМИУМ ======================
+
+def premium_buy_kb(stars: int) -> InlineKeyboardMarkup:
+    """Кнопка покупки премиума за Stars."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text=f"⭐ Купить за {stars} Stars", callback_data="premium:buy")
+    return builder.as_markup()
+
+
+def premium_active_kb() -> InlineKeyboardMarkup:
+    """Кнопки для активного премиума."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="👀 Кто меня лайкнул", callback_data="premium:wholiked")
+    return builder.as_markup()
+
+
 # ====================== РЕДАКТИРОВАНИЕ ======================
 
 # Какие поля можно редактировать и как (text — ввод текста, остальное — клавиатура)

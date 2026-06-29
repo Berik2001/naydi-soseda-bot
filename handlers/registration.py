@@ -11,7 +11,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 import texts
-from database.db import upsert_user
+from database.db import get_user, upsert_user
 from keyboards import inline
 from states.form import Form
 from validators import is_valid_about, parse_budget
@@ -54,10 +54,18 @@ async def step_gender(call: CallbackQuery, state: FSMContext) -> None:
 async def step_goal(call: CallbackQuery, state: FSMContext) -> None:
     key = call.data.split(":", 1)[1]
     await state.update_data(goal=texts.GOAL[key])  # сохраняем текстом
-    await state.set_state(Form.preferred_gender)
-    await call.message.edit_text(
-        texts.ASK_PREFERRED_GENDER, reply_markup=inline.preferred_gender_kb()
-    )
+
+    if key == "have_place":
+        # Быстрый путь для «есть жильё»: пол + цель + город -> сразу карточки.
+        # Предпочтение по полу по умолчанию «неважно», район/бюджет не спрашиваем.
+        await state.update_data(fast_path=True, preferred_gender="any")
+        await state.set_state(Form.city)
+        await call.message.edit_text(texts.ASK_CITY, reply_markup=inline.city_kb())
+    else:
+        await state.set_state(Form.preferred_gender)
+        await call.message.edit_text(
+            texts.ASK_PREFERRED_GENDER, reply_markup=inline.preferred_gender_kb()
+        )
     await call.answer()
 
 
@@ -85,7 +93,11 @@ async def step_city(call: CallbackQuery, state: FSMContext) -> None:
         return
 
     await state.update_data(city=value)
-    await _ask_district(call.message, state, value, edit=True)
+    data = await state.get_data()
+    if data.get("fast_path"):
+        await _finish_fast_path(call.message, state, call.from_user)
+    else:
+        await _ask_district(call.message, state, value, edit=True)
     await call.answer()
 
 
@@ -93,7 +105,28 @@ async def step_city(call: CallbackQuery, state: FSMContext) -> None:
 async def step_city_custom(message: Message, state: FSMContext) -> None:
     city = message.text.strip()
     await state.update_data(city=city)
-    await _ask_district(message, state, city, edit=False)
+    data = await state.get_data()
+    if data.get("fast_path"):
+        await _finish_fast_path(message, state, message.from_user)
+    else:
+        await _ask_district(message, state, city, edit=False)
+
+
+async def _finish_fast_path(message: Message, state: FSMContext, from_user) -> None:
+    """Сохранить минимальную анкету («есть жильё») и сразу показать кандидатов."""
+    data = await state.get_data()
+    data["telegram_id"] = from_user.id
+    data["username"] = from_user.username
+    data["full_name"] = from_user.full_name
+    # Незаполненные поля (район, бюджет, привычки, фото, о себе) уйдут как NULL
+    await upsert_user(data)
+    await state.clear()
+    await message.answer(texts.FAST_PATH_SAVED)
+
+    # Локальный импорт, чтобы не создавать циклических зависимостей
+    from handlers.matching import start_search
+    viewer = await get_user(from_user.id)
+    await start_search(message, viewer)
 
 
 async def _ask_district(message: Message, state: FSMContext, city: str, edit: bool):

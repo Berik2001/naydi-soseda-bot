@@ -27,6 +27,7 @@ def _sample_user(**overrides):
         "gender": "female",
         "city": "Алматы",
         "district": "Бостандык",
+        "goal": "🔍 Ищу комнату/квартиру",
         "budget": 120000,
         "move_in": "🔥 Срочно, сейчас",
         "smoking": "Нет",
@@ -60,3 +61,25 @@ def test_profile_card_handles_missing_name():
 def test_profile_card_male_gender():
     card = texts.profile_card(_sample_user(gender="male"))
     assert "👨 Парень" in card
+
+
+def test_profile_card_minimal_have_place():
+    """Минимальная анкета «есть жильё»: пол + город, остальное пусто."""
+    user = {
+        "full_name": "Хост",
+        "gender": "male",
+        "city": "Алматы",
+        "district": None,
+        "goal": "🤝 Есть жильё, ищу с кем жить",
+        "budget": None,
+        "move_in": None,
+        "smoking": None,
+        "pets": None,
+        "occupation": None,
+        "about": None,
+    }
+    card = texts.profile_card(user)
+    assert "Хост" in card
+    assert "📍 Алматы" in card
+    assert "None" not in card      # пустые поля не протекают как "None"
+    assert "тг" not in card        # строки бюджета нет

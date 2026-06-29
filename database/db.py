@@ -153,7 +153,12 @@ async def get_next_candidate(viewer: asyncpg.Record) -> asyncpg.Record | None:
       6. Кандидат активен
     """
     pool = get_pool()
-    budget_min, budget_max = budget_range(viewer["budget"] or 0)
+    # Если у смотрящего не указан бюджет (например, цель «есть жильё») —
+    # бюджет в фильтре не ограничиваем.
+    if viewer["budget"]:
+        budget_min, budget_max = budget_range(viewer["budget"])
+    else:
+        budget_min, budget_max = 0, 2_147_483_647
     pref = viewer["preferred_gender"]
 
     async with pool.acquire() as conn:
@@ -164,7 +169,8 @@ async def get_next_candidate(viewer: asyncpg.Record) -> asyncpg.Record | None:
               AND u.is_active = TRUE
               AND u.city = $2
               AND ($3 = 'any' OR u.gender = $3)
-              AND u.budget BETWEEN $4 AND $5
+              -- кандидаты без указанного бюджета (есть жильё) показываются всем
+              AND (u.budget IS NULL OR u.budget BETWEEN $4 AND $5)
               AND NOT EXISTS (
                     SELECT 1 FROM views v
                     WHERE v.viewer_id = $1 AND v.viewed_id = u.telegram_id

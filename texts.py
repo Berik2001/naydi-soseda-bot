@@ -63,6 +63,7 @@ ASK_ABOUT = (
 ABOUT_TOO_LONG = "🚫 Слишком длинно. Максимум 200 символов, попробуй короче."
 
 PROFILE_SAVED = "✅ Анкета сохранена! Используй /search, чтобы найти сожителей."
+FAST_PATH_SAVED = "✅ Готово! Вот кто ищет жильё — листай карточки 👇"
 PROFILE_RESTART = "🔄 Начнём заново."
 NO_PROFILE = "У тебя ещё нет анкеты. Нажми /start, чтобы создать."
 
@@ -207,19 +208,41 @@ def format_budget(amount: int) -> str:
 
 def profile_card(user: dict) -> str:
     """
-    Красивая карточка анкеты.
+    Красивая карточка анкеты. Показываются только заполненные поля —
+    минимальная анкета (например, цель «есть жильё»: пол + город) тоже выглядит аккуратно.
     user — словарь/Record с полями таблицы users.
     """
     name = user["full_name"] or "Без имени"
     gender = GENDER.get(user["gender"], "—")
-    about = user["about"] or "—"
-    return (
-        "✅ Твоя анкета готова!\n\n"
-        f"👤 {name}, {gender}\n"
-        f"📍 {user['city']}, {user['district']}\n"
-        f"💰 {format_budget(user['budget'])}\n"
-        f"📅 {user['move_in']}\n"
-        f"🚭 {user['smoking']} | 🐾 {user['pets']}\n"
-        f"💼 {user['occupation']}\n"
-        f"💬 «{about}»"
-    )
+
+    lines = ["✅ Твоя анкета готова!", "", f"👤 {name}, {gender}"]
+
+    # Локация: город всегда, район — если указан
+    if user["district"]:
+        lines.append(f"📍 {user['city']}, {user['district']}")
+    elif user["city"]:
+        lines.append(f"📍 {user['city']}")
+
+    if user["goal"]:
+        lines.append(f"🎯 {user['goal']}")
+    if user["budget"]:
+        lines.append(f"💰 {format_budget(user['budget'])}")
+    if user["move_in"]:
+        lines.append(f"📅 {user['move_in']}")
+
+    # Привычки — только заполненные
+    habits = []
+    if user["smoking"]:
+        habits.append(f"🚭 {user['smoking']}")
+    if user["pets"]:
+        habits.append(f"🐾 {user['pets']}")
+    if habits:
+        lines.append(" | ".join(habits))
+
+    if user["occupation"]:
+        lines.append(f"💼 {user['occupation']}")
+
+    # «О себе» показываем всегда (с прочерком, если пусто)
+    lines.append(f"💬 «{user['about'] or '—'}»")
+
+    return "\n".join(lines)

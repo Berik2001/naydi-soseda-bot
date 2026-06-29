@@ -65,11 +65,13 @@ async def _send_candidate(message: Message, candidate) -> None:
     elif candidate["photo_file_id"]:
         await message.answer_photo(
             photo=candidate["photo_file_id"],
-            caption=texts.profile_card(candidate),
+            caption=texts.profile_card(candidate, header=None),
             reply_markup=kb,
         )
     else:
-        await message.answer(texts.profile_card(candidate), reply_markup=kb)
+        await message.answer(
+            texts.profile_card(candidate, header=None), reply_markup=kb
+        )
 
 
 async def _show_next(message: Message, viewer_id: int) -> None:

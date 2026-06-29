@@ -20,7 +20,6 @@ CREATE TABLE IF NOT EXISTS users (
     move_in         TEXT,
     smoking         TEXT,
     pets            TEXT,
-    schedule        TEXT,
     occupation      TEXT,
     photo_file_id   TEXT,
     about           TEXT,

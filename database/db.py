@@ -70,14 +70,14 @@ async def upsert_user(data: dict) -> None:
             INSERT INTO users (
                 telegram_id, username, full_name, gender, goal,
                 preferred_gender, city, district, budget, move_in,
-                smoking, pets, schedule, occupation, photo_file_id,
+                smoking, pets, occupation, photo_file_id,
                 about, is_active
             )
             VALUES (
                 $1, $2, $3, $4, $5,
                 $6, $7, $8, $9, $10,
                 $11, $12, $13, $14, $15,
-                $16, TRUE
+                TRUE
             )
             ON CONFLICT (telegram_id) DO UPDATE SET
                 username = EXCLUDED.username,
@@ -91,7 +91,6 @@ async def upsert_user(data: dict) -> None:
                 move_in = EXCLUDED.move_in,
                 smoking = EXCLUDED.smoking,
                 pets = EXCLUDED.pets,
-                schedule = EXCLUDED.schedule,
                 occupation = EXCLUDED.occupation,
                 photo_file_id = EXCLUDED.photo_file_id,
                 about = EXCLUDED.about,
@@ -101,7 +100,7 @@ async def upsert_user(data: dict) -> None:
             data.get("gender"), data.get("goal"), data.get("preferred_gender"),
             data.get("city"), data.get("district"), data.get("budget"),
             data.get("move_in"), data.get("smoking"), data.get("pets"),
-            data.get("schedule"), data.get("occupation"),
+            data.get("occupation"),
             data.get("photo_file_id"), data.get("about"),
         )
 
@@ -113,7 +112,7 @@ async def update_field(telegram_id: int, field: str, value) -> None:
     """
     allowed = {
         "gender", "goal", "preferred_gender", "city", "district",
-        "budget", "move_in", "smoking", "pets", "schedule",
+        "budget", "move_in", "smoking", "pets",
         "occupation", "photo_file_id", "about",
     }
     if field not in allowed:

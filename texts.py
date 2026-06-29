@@ -52,7 +52,6 @@ ASK_BUDGET_RETRY = (
 ASK_MOVE_IN = "📅 Когда планируешь заехать?"
 ASK_SMOKING = "🚭 Куришь?"
 ASK_PETS = "🐾 Есть животные?"
-ASK_SCHEDULE = "🌙 Режим жизни?"
 ASK_OCCUPATION = "💼 Ты:"
 ASK_PHOTO = "📸 Загрузи фото профиля (повышает доверие)\nМожно пропустить"
 ASK_ABOUT = (
@@ -130,12 +129,6 @@ PETS = {
     "planning": "Планирую завести",
 }
 
-SCHEDULE = {
-    "lark": "🌅 Жаворонок",
-    "owl": "🦉 Сова",
-    "flexible": "🤷 Гибкий",
-}
-
 OCCUPATION = {
     "student": "🎓 Студент/ка",
     "work": "💼 Работаю",
@@ -171,7 +164,7 @@ def profile_card(user: dict) -> str:
         f"📍 {user['city']}, {user['district']}\n"
         f"💰 {format_budget(user['budget'])}\n"
         f"📅 {user['move_in']}\n"
-        f"🚭 {user['smoking']} | 🐾 {user['pets']} | {user['schedule']}\n"
+        f"🚭 {user['smoking']} | 🐾 {user['pets']}\n"
         f"💼 {user['occupation']}\n"
         f"💬 «{about}»"
     )

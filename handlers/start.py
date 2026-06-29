@@ -31,7 +31,6 @@ _CHOICE_OPTIONS = {
     "move_in": texts.MOVE_IN,
     "smoking": texts.SMOKING,
     "pets": texts.PETS,
-    "schedule": texts.SCHEDULE,
     "occupation": texts.OCCUPATION,
 }
 

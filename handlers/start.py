@@ -13,6 +13,7 @@ from database.db import get_user, set_active, update_field
 from handlers.registration import start_registration
 from keyboards import inline
 from states.form import Edit
+from validators import is_valid_about, parse_budget
 
 router = Router()
 
@@ -150,15 +151,14 @@ async def edit_text_set(message: Message, state: FSMContext) -> None:
     field = data.get("edit_field")
     text = message.text.strip()
 
-    # Валидация по полю
+    # Валидация по полю (та же логика, что и в регистрации)
     if field == "budget":
-        raw = text.replace(" ", "")
-        if not raw.isdigit() or not (10000 <= int(raw) <= 5000000):
+        value = parse_budget(text)
+        if value is None:
             await message.answer(texts.ASK_BUDGET_RETRY)
             return
-        value = int(raw)
     elif field == "about":
-        if len(text) > 200:
+        if not is_valid_about(text):
             await message.answer(texts.ABOUT_TOO_LONG)
             return
         value = text

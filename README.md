@@ -73,6 +73,18 @@ python bot.py
 
 ---
 
+## 🧪 Тесты и CI/CD
+
+```bash
+pip install -r requirements-dev.txt
+pytest                      # запустить все тесты
+ruff check .                # линт
+```
+
+- **CI** ([.github/workflows/ci.yml](.github/workflows/ci.yml)): на каждый push/PR прогоняются линт, проверка компиляции и `pytest`.
+- **CD**: Railway деплоит из ветки `main` и настроен **ждать зелёного CI** (service → Settings → *Wait for CI*) — сломанный код в прод не уедет.
+- Бизнес-логика (валидация бюджета, лимит «о себе», диапазон бюджета для мэтчинга) вынесена в [validators.py](validators.py) и покрыта тестами.
+
 ## 🗂 Структура проекта
 
 ```

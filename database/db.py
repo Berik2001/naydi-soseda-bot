@@ -11,6 +11,7 @@ from __future__ import annotations  # поддержка синтаксиса "X
 import asyncpg
 
 from database.models import ALL_TABLES
+from validators import budget_range
 
 # Глобальный пул соединений
 _pool: asyncpg.Pool | None = None
@@ -150,9 +151,7 @@ async def get_next_candidate(viewer: asyncpg.Record) -> asyncpg.Record | None:
       6. Кандидат активен
     """
     pool = get_pool()
-    budget = viewer["budget"] or 0
-    budget_min = int(budget * 0.7)
-    budget_max = int(budget * 1.3)
+    budget_min, budget_max = budget_range(viewer["budget"] or 0)
     pref = viewer["preferred_gender"]
 
     async with pool.acquire() as conn:

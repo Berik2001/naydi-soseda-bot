@@ -1,0 +1,4 @@
+[tool.pytest.ini_options]
+# Корень проекта добавляется в sys.path, чтобы тесты видели модули (texts, validators)
+pythonpath = ["."]
+testpaths = ["tests"]

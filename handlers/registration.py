@@ -14,6 +14,7 @@ import texts
 from database.db import upsert_user
 from keyboards import inline
 from states.form import Form
+from validators import is_valid_about, parse_budget
 
 router = Router()
 
@@ -141,14 +142,9 @@ async def step_district_custom(message: Message, state: FSMContext) -> None:
 
 @router.message(Form.budget, F.text)
 async def step_budget(message: Message, state: FSMContext) -> None:
-    # Убираем пробелы между цифрами
-    raw = message.text.replace(" ", "")
-    if not raw.isdigit():
-        await message.answer(texts.ASK_BUDGET_RETRY)
-        return
-
-    amount = int(raw)
-    if amount < 10000 or amount > 5000000:
+    # Разбор и валидация вынесены в validators.parse_budget (покрыто тестами)
+    amount = parse_budget(message.text)
+    if amount is None:
         await message.answer(texts.ASK_BUDGET_RETRY)
         return
 
@@ -236,7 +232,7 @@ async def step_photo_skip(call: CallbackQuery, state: FSMContext) -> None:
 @router.message(Form.about, F.text)
 async def step_about(message: Message, state: FSMContext) -> None:
     text = message.text.strip()
-    if len(text) > 200:
+    if not is_valid_about(text):
         await message.answer(texts.ABOUT_TOO_LONG)
         return
     await state.update_data(about=text)

@@ -27,4 +27,7 @@ class Form(StatesGroup):
 
 class Edit(StatesGroup):
     """Состояния редактирования отдельных полей анкеты."""
-    waiting_value = State()  # ждём новое текстовое значение (город/район/бюджет/о себе)
+    waiting_value = State()         # ждём новое текстовое значение (город/район/бюджет/о себе)
+    waiting_photo = State()         # ждём новое фото профиля
+    waiting_loc_city = State()      # ждём текстовый ввод города (через меню анкеты)
+    waiting_loc_district = State()  # ждём текстовый ввод района (через меню анкеты)

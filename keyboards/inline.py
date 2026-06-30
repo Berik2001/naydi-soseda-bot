@@ -11,6 +11,8 @@ from __future__ import annotations  # поддержка "X | None" на Python 
 from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -105,18 +107,17 @@ def profile_menu_kb(role: str | None) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def apartment_photos_done_kb() -> InlineKeyboardMarkup:
-    """Кнопка завершения загрузки фото квартиры."""
-    builder = InlineKeyboardBuilder()
-    builder.button(text="Готово ✅", callback_data="aptphoto:done")
-    return builder.as_markup()
-
-
-def media_done_kb() -> InlineKeyboardMarkup:
-    """Кнопка завершения загрузки медиа профиля (фото/видео ищущего)."""
-    builder = InlineKeyboardBuilder()
-    builder.button(text="Готово ✅", callback_data="media:done")
-    return builder.as_markup()
+def photos_done_kb() -> ReplyKeyboardMarkup:
+    """
+    Нижняя клавиатура с одной кнопкой «Готово ✅» для загрузки нескольких
+    фото/видео. В отличие от inline-кнопки под каждым фото, она висит внизу
+    и не дублируется — поэтому на каждое фото отвечать не нужно.
+    """
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=texts.PHOTOS_DONE_BTN)]],
+        resize_keyboard=True,
+        input_field_placeholder="Пришли фото и нажми «Готово ✅»",
+    )
 
 
 def profile_city_kb() -> InlineKeyboardMarkup:

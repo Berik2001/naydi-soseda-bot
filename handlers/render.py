@@ -23,32 +23,39 @@ def _get(obj, key):
 
 
 async def send_media_card(message: Message, user, card_text: str, reply_markup=None) -> None:
-    """Отправить карточку с медиа и (опционально) кнопками."""
+    """
+    Отправить карточку с медиа и (опционально) кнопками.
+
+    Правила отображения:
+    - 2–10 фото → media group (альбом): Telegram показывает их компактной
+      сеткой, как в каналах объявлений. Кнопки/текст идут отдельным сообщением,
+      т.к. у альбома не может быть inline-клавиатуры.
+    - ровно 1 фото → обычное фото с подписью (одиночное фото Telegram всегда
+      показывает крупно — это его поведение, через Bot API не уменьшить).
+    - видео → видео с подписью.
+    """
     role = _get(user, "role")
 
-    # Сдающий — альбом фото квартиры
+    # Источник медиа зависит от роли
     if role == "provider":
-        photos = _get(user, "apartment_photos") or []
-        if photos:
-            await message.answer_media_group([InputMediaPhoto(media=f) for f in photos])
-        await message.answer(card_text, reply_markup=reply_markup)
-        return
+        media = list(_get(user, "apartment_photos") or [])
+        mtype = "photo"
+    else:
+        media = list(_get(user, "profile_media") or [])
+        mtype = _get(user, "profile_media_type")
 
-    # Ищущий — до 2 фото или 1 видео
-    media = _get(user, "profile_media") or []
-    mtype = _get(user, "profile_media_type")
+    # Запасной вариант для старых анкет с одиночным photo_file_id
+    if not media and _get(user, "photo_file_id"):
+        media = [_get(user, "photo_file_id")]
+        mtype = "photo"
 
     if mtype == "video" and media:
         await message.answer_video(media[0], caption=card_text, reply_markup=reply_markup)
     elif mtype == "photo" and len(media) >= 2:
-        await message.answer_media_group([InputMediaPhoto(media=f) for f in media])
+        # Альбом: максимум 10 элементов в одной media group
+        await message.answer_media_group([InputMediaPhoto(media=f) for f in media[:10]])
         await message.answer(card_text, reply_markup=reply_markup)
     elif mtype == "photo" and len(media) == 1:
         await message.answer_photo(media[0], caption=card_text, reply_markup=reply_markup)
-    elif _get(user, "photo_file_id"):
-        # старые анкеты с одиночным фото
-        await message.answer_photo(
-            _get(user, "photo_file_id"), caption=card_text, reply_markup=reply_markup
-        )
     else:
         await message.answer(card_text, reply_markup=reply_markup)

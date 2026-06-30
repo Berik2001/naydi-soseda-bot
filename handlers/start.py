@@ -3,15 +3,21 @@
 Команды: /start, /help, /profile, /edit, /pause, /resume.
 """
 
+import asyncio
+
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 
 from handlers.render import send_media_card
 
 # Максимум фото квартиры (как в регистрации)
 MAX_APARTMENT_PHOTOS = 10
+
+# Сериализует чтение-запись списка фото при конкурентной загрузке альбома
+# (aiogram обрабатывает апдейты как параллельные задачи).
+_photos_lock = asyncio.Lock()
 
 import texts
 from database.db import get_user, set_active, update_field
@@ -135,40 +141,41 @@ async def profile_apt_photos(call: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(Edit.waiting_apartment_photos)
     await state.update_data(apt_photos=[])
     await call.message.answer(
-        texts.ASK_APARTMENT_PHOTOS, reply_markup=inline.apartment_photos_done_kb()
+        texts.ASK_APARTMENT_PHOTOS, reply_markup=inline.photos_done_kb()
     )
     await call.answer()
+
+
+@router.message(Edit.waiting_apartment_photos, F.text == texts.PHOTOS_DONE_BTN)
+async def edit_apt_photos_done(message: Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    photos = data.get("apt_photos") or []
+    if not photos:
+        await message.answer(
+            texts.APARTMENT_PHOTOS_NEED_ONE, reply_markup=inline.photos_done_kb()
+        )
+        return
+    await update_field(message.from_user.id, "apartment_photos", photos)
+    await state.clear()
+    await message.answer(texts.PHOTO_UPDATED, reply_markup=ReplyKeyboardRemove())
+    await show_updated_profile(message, message.from_user.id)
 
 
 @router.message(Edit.waiting_apartment_photos, F.photo)
 async def edit_apt_photo(message: Message, state: FSMContext) -> None:
-    data = await state.get_data()
-    photos = list(data.get("apt_photos") or [])
-    if len(photos) >= MAX_APARTMENT_PHOTOS:
-        await message.answer(
-            texts.APARTMENT_PHOTOS_MAX, reply_markup=inline.apartment_photos_done_kb()
-        )
-        return
-    photos.append(message.photo[-1].file_id)
-    await state.update_data(apt_photos=photos)
-    await message.answer(
-        texts.apartment_photo_added(len(photos)),
-        reply_markup=inline.apartment_photos_done_kb(),
-    )
+    async with _photos_lock:
+        data = await state.get_data()
+        photos = list(data.get("apt_photos") or [])
+        if len(photos) >= MAX_APARTMENT_PHOTOS:
+            return  # больше 10 не добавляем (молча)
+        photos.append(message.photo[-1].file_id)
+        await state.update_data(apt_photos=photos)
+    # На каждое фото не отвечаем — кнопка «Готово ✅» снизу.
 
 
-@router.callback_query(Edit.waiting_apartment_photos, F.data == "aptphoto:done")
-async def edit_apt_photos_done(call: CallbackQuery, state: FSMContext) -> None:
-    data = await state.get_data()
-    photos = data.get("apt_photos") or []
-    if not photos:
-        await call.answer(texts.APARTMENT_PHOTOS_NEED_ONE, show_alert=True)
-        return
-    await update_field(call.from_user.id, "apartment_photos", photos)
-    await state.clear()
-    await call.message.answer(texts.PHOTO_UPDATED)
-    await call.answer()
-    await show_updated_profile(call.message, call.from_user.id)
+@router.message(Edit.waiting_apartment_photos)
+async def edit_apt_photos_wrong(message: Message) -> None:
+    await message.answer(texts.ASK_APARTMENT_PHOTOS, reply_markup=inline.photos_done_kb())
 
 
 # ---------- Изменение медиа профиля (seeker: до 2 фото / 1 видео) ----------
@@ -177,53 +184,53 @@ async def edit_apt_photos_done(call: CallbackQuery, state: FSMContext) -> None:
 async def profile_photo(call: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(Edit.waiting_photo)
     await state.update_data(new_media=[], new_media_type=None)
-    await call.message.answer(texts.ASK_PHOTO, reply_markup=inline.media_done_kb())
+    await call.message.answer(texts.ASK_PHOTO, reply_markup=inline.photos_done_kb())
     await call.answer()
+
+
+@router.message(Edit.waiting_photo, F.text == texts.PHOTOS_DONE_BTN)
+async def profile_media_done(message: Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    media = data.get("new_media") or []
+    if not media:
+        await message.answer(texts.PHOTO_NEED_ONE, reply_markup=inline.photos_done_kb())
+        return
+    await update_field(message.from_user.id, "profile_media", media)
+    await update_field(message.from_user.id, "profile_media_type", data.get("new_media_type"))
+    await state.clear()
+    await message.answer(texts.PHOTO_UPDATED, reply_markup=ReplyKeyboardRemove())
+    await show_updated_profile(message, message.from_user.id)
 
 
 @router.message(Edit.waiting_photo, F.photo)
 async def profile_photo_set(message: Message, state: FSMContext) -> None:
-    data = await state.get_data()
-    media = list(data.get("new_media") or [])
-    if data.get("new_media_type") == "video":
-        await message.answer(texts.MEDIA_PHOTO_AFTER_VIDEO, reply_markup=inline.media_done_kb())
-        return
-    if len(media) >= 2:
-        await message.answer(texts.PHOTO_MAX_TWO, reply_markup=inline.media_done_kb())
-        return
-    media.append(message.photo[-1].file_id)
-    await state.update_data(new_media=media, new_media_type="photo")
-    await message.answer(texts.photo_added(len(media)), reply_markup=inline.media_done_kb())
+    async with _photos_lock:
+        data = await state.get_data()
+        media = list(data.get("new_media") or [])
+        if data.get("new_media_type") == "video":
+            await message.answer(texts.MEDIA_PHOTO_AFTER_VIDEO)
+            return
+        if len(media) >= 2:
+            await message.answer(texts.PHOTO_MAX_TWO)
+            return
+        media.append(message.photo[-1].file_id)
+        await state.update_data(new_media=media, new_media_type="photo")
+    # На каждое фото не отвечаем — кнопка «Готово ✅» снизу.
 
 
 @router.message(Edit.waiting_photo, F.video)
 async def profile_video_set(message: Message, state: FSMContext) -> None:
     data = await state.get_data()
     if data.get("new_media") and data.get("new_media_type") == "photo":
-        await message.answer(texts.MEDIA_VIDEO_AFTER_PHOTO, reply_markup=inline.media_done_kb())
+        await message.answer(texts.MEDIA_VIDEO_AFTER_PHOTO)
         return
     await state.update_data(new_media=[message.video.file_id], new_media_type="video")
-    await message.answer(texts.MEDIA_VIDEO_ADDED, reply_markup=inline.media_done_kb())
-
-
-@router.callback_query(Edit.waiting_photo, F.data == "media:done")
-async def profile_media_done(call: CallbackQuery, state: FSMContext) -> None:
-    data = await state.get_data()
-    media = data.get("new_media") or []
-    if not media:
-        await call.answer(texts.PHOTO_NEED_ONE, show_alert=True)
-        return
-    await update_field(call.from_user.id, "profile_media", media)
-    await update_field(call.from_user.id, "profile_media_type", data.get("new_media_type"))
-    await state.clear()
-    await call.message.answer(texts.PHOTO_UPDATED)
-    await call.answer()
-    await show_updated_profile(call.message, call.from_user.id)
+    await message.answer(texts.MEDIA_VIDEO_ADDED)
 
 
 @router.message(Edit.waiting_photo)
 async def profile_photo_wrong(message: Message) -> None:
-    await message.answer(texts.PHOTO_NEED_ONE, reply_markup=inline.media_done_kb())
+    await message.answer(texts.PHOTO_NEED_ONE, reply_markup=inline.photos_done_kb())
 
 
 # ---------- Изменение города / района ----------
@@ -237,8 +244,10 @@ async def profile_location(call: CallbackQuery, state: FSMContext) -> None:
 
 async def _ask_profile_district(call: CallbackQuery, state: FSMContext) -> None:
     """Район вводится текстом (пользователь пишет сам)."""
+    user = await get_user(call.from_user.id)
+    role = user["role"] if user else None
     await state.set_state(Edit.waiting_loc_district)
-    await call.message.edit_text(texts.ASK_DISTRICT_CUSTOM)
+    await call.message.edit_text(texts.ask_district(role))
 
 
 @router.callback_query(F.data.startswith("pcity:"))
@@ -258,9 +267,11 @@ async def profile_city_set(call: CallbackQuery, state: FSMContext) -> None:
 async def profile_city_text(message: Message, state: FSMContext) -> None:
     city = message.text.strip()
     await update_field(message.from_user.id, "city", city)
+    user = await get_user(message.from_user.id)
+    role = user["role"] if user else None
     # Район вводится текстом
     await state.set_state(Edit.waiting_loc_district)
-    await message.answer(texts.ASK_DISTRICT_CUSTOM)
+    await message.answer(texts.ask_district(role))
 
 
 @router.message(Edit.waiting_loc_district, F.text)
@@ -315,12 +326,15 @@ async def edit_field_chosen(call: CallbackQuery, state: FSMContext) -> None:
         # Поле редактируется текстом — ждём ввод
         await state.set_state(Edit.waiting_value)
         await state.update_data(edit_field=field)
-        prompt = {
-            "city": texts.ASK_CITY_CUSTOM,
-            "district": texts.ASK_DISTRICT_CUSTOM,
-            "budget": texts.ASK_BUDGET,
-            "about": texts.ASK_ABOUT,
-        }[field]
+        if field == "district":
+            user = await get_user(call.from_user.id)
+            prompt = texts.ask_district(user["role"] if user else None)
+        else:
+            prompt = {
+                "city": texts.ASK_CITY_CUSTOM,
+                "budget": texts.ASK_BUDGET,
+                "about": texts.ASK_ABOUT,
+            }[field]
         await call.message.edit_text(prompt)
     else:
         # Поле-выбор — показываем клавиатуру вариантов

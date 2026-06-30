@@ -51,9 +51,28 @@ async def start_registration(message: Message, state: FSMContext, user) -> None:
 async def step_gender(call: CallbackQuery, state: FSMContext) -> None:
     value = call.data.split(":", 1)[1]  # female / male
     await state.update_data(gender=value)
-    await state.set_state(Form.goal)
-    await call.message.edit_text(texts.ASK_GOAL, reply_markup=inline.goal_kb())
+    await state.set_state(Form.name)
+    await call.message.edit_text(texts.ASK_NAME)
     await call.answer()
+
+
+# ====================== ШАГ 1.5 — ИМЯ ======================
+
+@router.message(Form.name, F.text)
+async def step_name(message: Message, state: FSMContext) -> None:
+    name = message.text.strip()
+    if len(name) > 50:
+        await message.answer(texts.NAME_TOO_LONG)
+        return
+    # Имя из анкеты используем как full_name (приоритетнее имени из Telegram)
+    await state.update_data(full_name=name)
+    await state.set_state(Form.goal)
+    await message.answer(texts.ASK_GOAL, reply_markup=inline.goal_kb())
+
+
+@router.message(Form.name)
+async def step_name_wrong(message: Message) -> None:
+    await message.answer(texts.SEND_TEXT)
 
 
 # ====================== ШАГ 2 — ЦЕЛЬ ======================
@@ -323,6 +342,7 @@ async def _show_card_preview(message: Message, state: FSMContext) -> None:
     """Собрать данные и показать карточку (анкету или объявление) с кнопками."""
     data = await state.get_data()
     await state.set_state(Form.confirm)
+    await message.answer(texts.PREVIEW_INTRO)
 
     if _is_provider(data):
         # Объявление: альбом фото квартиры + текст
@@ -345,10 +365,11 @@ async def _show_card_preview(message: Message, state: FSMContext) -> None:
 async def confirm_save(call: CallbackQuery, state: FSMContext) -> None:
     """Сохранить анкету в БД."""
     data = await state.get_data()
-    # Дополняем данными из Telegram-профиля
+    # Дополняем данными из Telegram-профиля.
+    # full_name НЕ трогаем — там имя, которое пользователь ввёл сам.
     data["telegram_id"] = call.from_user.id
     data["username"] = call.from_user.username
-    data["full_name"] = call.from_user.full_name
+    data.setdefault("full_name", call.from_user.full_name)
 
     await upsert_user(data)
     await state.clear()

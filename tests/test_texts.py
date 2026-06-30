@@ -63,6 +63,23 @@ def test_profile_card_male_gender():
     assert "👨 Парень" in card
 
 
+def test_profile_card_goal_on_top_no_duplicate_emojis():
+    """Цель сверху, без дублирующихся префиксов-эмодзи."""
+    user = _sample_user(
+        goal="🔍 Нет жилья — ищу куда подселиться",
+        move_in="📅 В течение 2 недель",
+        occupation="💼 Работаю",
+    )
+    card = texts.profile_card(user)
+    # цель — первая строка карточки
+    assert card.startswith("🔍 Нет жилья — ищу куда подселиться")
+    # нет двойных эмодзи
+    assert "📅 📅" not in card
+    assert "💼 💼" not in card
+    assert "🎯" not in card        # старый префикс цели убран
+    assert "👤 Моя анкета" not in card
+
+
 def test_profile_card_minimal_have_place():
     """Минимальная анкета «есть жильё»: пол + город, остальное пусто."""
     user = {

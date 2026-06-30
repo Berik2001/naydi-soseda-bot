@@ -9,6 +9,7 @@ from aiogram.fsm.state import State, StatesGroup
 class Form(StatesGroup):
     """Шаги последовательной анкеты (регистрация)."""
     gender = State()            # Шаг 1 — пол
+    name = State()              # Шаг 1.5 — имя
     goal = State()              # Шаг 2 — цель
     preferred_gender = State()  # Шаг 3 — предпочтение по полу сожителя
     city = State()              # Шаг 4 — город (кнопки)

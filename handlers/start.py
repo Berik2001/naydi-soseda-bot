@@ -127,10 +127,16 @@ async def profile_budget(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == "profile:about")
 async def profile_about(call: CallbackQuery, state: FSMContext) -> None:
-    """✍️ Изменить «о себе» — общий поток текстового редактирования."""
+    """✍️ Изменить «о себе» — общий поток текстового редактирования.
+    Для сдающего это описание объявления (с примером по полу)."""
+    user = await get_user(call.from_user.id)
     await state.set_state(Edit.waiting_value)
     await state.update_data(edit_field="about")
-    await call.message.answer(texts.ASK_ABOUT)
+    if user and user["role"] == "provider":
+        prompt = texts.ask_listing_desc(user["gender"])
+    else:
+        prompt = texts.ASK_ABOUT
+    await call.message.answer(prompt)
     await call.answer()
 
 

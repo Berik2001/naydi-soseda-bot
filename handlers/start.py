@@ -327,6 +327,10 @@ async def edit_choice_set(call: CallbackQuery) -> None:
         value = _CHOICE_OPTIONS[field][key]  # остальные — текстом
 
     await update_field(call.from_user.id, field, value)
+    # Цель определяет роль (seeker/provider) — синхронизируем
+    if field == "goal":
+        await update_field(call.from_user.id, "role", texts.GOAL_ROLE[key])
+
     await call.message.edit_text("✅ Изменено!")
     await call.answer("Готово")
 

@@ -119,6 +119,15 @@ async def profile_budget(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
 
 
+@router.callback_query(F.data == "profile:about")
+async def profile_about(call: CallbackQuery, state: FSMContext) -> None:
+    """✍️ Изменить «о себе» — общий поток текстового редактирования."""
+    await state.set_state(Edit.waiting_value)
+    await state.update_data(edit_field="about")
+    await call.message.answer(texts.ASK_ABOUT)
+    await call.answer()
+
+
 # ---------- Изменение фото квартиры (provider) ----------
 
 @router.callback_query(F.data == "profile:apt_photos")

@@ -48,16 +48,6 @@ def city_kb() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def move_in_kb() -> InlineKeyboardMarkup:
-    """Шаг 7 — когда нужно."""
-    return _kb_from_dict("move", texts.MOVE_IN, width=1)
-
-
-def occupation_kb() -> InlineKeyboardMarkup:
-    """Шаг 8 — занятость."""
-    return _kb_from_dict("occ", texts.OCCUPATION, width=1)
-
-
 def skip_photo_kb() -> InlineKeyboardMarkup:
     """Шаг 12 — кнопка «Пропустить» для фото."""
     builder = InlineKeyboardBuilder()
@@ -157,8 +147,6 @@ EDIT_FIELDS = {
     "city": "Город",
     "district": "Район",
     "budget": "Бюджет",
-    "move_in": "Когда нужно",
-    "occupation": "Занятость",
     "about": "О себе",
 }
 

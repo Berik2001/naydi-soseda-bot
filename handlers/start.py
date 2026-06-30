@@ -38,8 +38,6 @@ _KEY_FIELDS = {"gender", "preferred_gender"}
 _CHOICE_OPTIONS = {
     "gender": texts.GENDER,
     "goal": texts.GOAL,
-    "move_in": texts.MOVE_IN,
-    "occupation": texts.OCCUPATION,
 }
 
 

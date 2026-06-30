@@ -195,8 +195,11 @@ async def step_budget(message: Message, state: FSMContext) -> None:
         await state.set_state(Form.apartment_photos)
         await message.answer(texts.ASK_APARTMENT_PHOTOS)
     else:
-        await state.set_state(Form.move_in)
-        await message.answer(texts.ASK_MOVE_IN, reply_markup=inline.move_in_kb())
+        # Ищущий -> сразу к фото профиля (шаги «когда заехать» и «занятость»
+        # убраны: это пользователь пишет свободно в «о себе»).
+        await state.update_data(profile_media=[], profile_media_type=None, done_msg_id=None)
+        await state.set_state(Form.photo)
+        await message.answer(texts.ASK_PHOTO)
 
 
 # ====================== ОБЪЯВЛЕНИЕ: ФОТО КВАРТИРЫ (сдаю) ======================
@@ -257,34 +260,7 @@ async def step_listing_about_wrong(message: Message) -> None:
     await message.answer(texts.SEND_TEXT)
 
 
-# ====================== ШАГ 7 — КОГДА НУЖНО ======================
-
-@router.callback_query(Form.move_in, F.data.startswith("move:"))
-async def step_move_in(call: CallbackQuery, state: FSMContext) -> None:
-    key = call.data.split(":", 1)[1]
-    await state.update_data(move_in=texts.MOVE_IN[key])
-    # Курение и животные больше не спрашиваем — сразу к занятости.
-    await state.set_state(Form.occupation)
-    await call.message.edit_text(texts.ASK_OCCUPATION, reply_markup=inline.occupation_kb())
-    await call.answer()
-
-
-# ====================== ШАГ 8 — ЗАНЯТОСТЬ ======================
-
-@router.callback_query(Form.occupation, F.data.startswith("occ:"))
-async def step_occupation(call: CallbackQuery, state: FSMContext) -> None:
-    key = call.data.split(":", 1)[1]
-    await state.update_data(occupation=texts.OCCUPATION[key])
-    await state.update_data(profile_media=[], profile_media_type=None, done_msg_id=None)
-    await state.set_state(Form.photo)
-    # Фиксируем выбор занятости (убираем кнопки) и просим фото отдельным
-    # сообщением. Кнопка «Готово ✅» появится «плавающей» под фото.
-    await call.message.edit_text(texts.OCCUPATION[key])
-    await call.message.answer(texts.ASK_PHOTO)
-    await call.answer()
-
-
-# ====================== ШАГ 9 — ФОТО / ВИДЕО (обязательно) ======================
+# ====================== ШАГ 7 — ФОТО / ВИДЕО (обязательно) ======================
 
 @router.message(Form.photo, F.photo)
 async def step_photo(message: Message, state: FSMContext) -> None:
@@ -384,7 +360,5 @@ async def _show_card_preview(message: Message, state: FSMContext) -> None:
 @router.message(Form.gender)
 @router.message(Form.goal)
 @router.message(Form.city)
-@router.message(Form.move_in)
-@router.message(Form.occupation)
 async def wrong_input_button(message: Message) -> None:
     await message.answer(texts.PRESS_BUTTON)

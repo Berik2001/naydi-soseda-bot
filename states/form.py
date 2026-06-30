@@ -17,10 +17,8 @@ class Form(StatesGroup):
     budget = State()            # Шаг 6 — бюджет (ищу) / цена аренды (сдаю)
     apartment_photos = State()  # сдаю: фото квартиры (до 10)
     listing_about = State()     # сдаю: описание объявления
-    move_in = State()           # Шаг 7 — когда нужно
-    occupation = State()        # Шаг 8 — занятость
-    photo = State()             # Шаг 9 — фото
-    about = State()             # Шаг 10 — о себе
+    photo = State()             # Шаг 7 — фото
+    about = State()             # Шаг 8 — о себе
 
 
 class Edit(StatesGroup):

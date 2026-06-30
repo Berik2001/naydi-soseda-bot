@@ -145,11 +145,12 @@ def test_listing_card_provider():
         "about": "2 комнаты, есть мебель",
     }
     card = texts.listing_card(user)
-    assert card.startswith("🏠 Сдаётся жильё")
+    assert card.startswith("🏠 Есть жильё — ищу соседа")
     assert "Астана, Есиль" in card
     assert "150 000 тг/мес" in card
     assert "2 комнаты, есть мебель" in card
-    assert "👩 Только с девушкой" in card
+    # Строка «Сожитель» убрана из карточки
+    assert "Сожитель" not in card
 
 
 def test_user_card_dispatch_by_role():
@@ -158,4 +159,4 @@ def test_user_card_dispatch_by_role():
         "role": "provider", "full_name": "Х", "gender": "male", "city": "Алматы",
         "district": None, "preferred_gender": "any", "budget": 120000, "about": None,
     }
-    assert texts.user_card(provider).startswith("🏠 Сдаётся жильё")
+    assert texts.user_card(provider).startswith("🏠 Есть жильё — ищу соседа")

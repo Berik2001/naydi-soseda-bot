@@ -38,13 +38,8 @@ def goal_kb() -> InlineKeyboardMarkup:
     return _kb_from_dict("goal", texts.GOAL, width=1)
 
 
-def preferred_gender_kb() -> InlineKeyboardMarkup:
-    """Шаг 3 — предпочтение по полу сожителя."""
-    return _kb_from_dict("pref", texts.PREFERRED_GENDER, width=1)
-
-
 def city_kb() -> InlineKeyboardMarkup:
-    """Шаг 4 — город."""
+    """Шаг 3 — город."""
     builder = InlineKeyboardBuilder()
     for city in texts.CITIES:
         builder.button(text=city, callback_data=f"city:{city}")
@@ -165,7 +160,7 @@ EDIT_FIELDS = {
     "gender": "Пол",
     # «Цель» не редактируем точечно: она задаёт роль (ищу/сдаю) и набор полей.
     # Смена роли — только через «Заполнить заново».
-    "preferred_gender": "С кем жить",
+    # «С кем жить» не редактируем: пол сожителя всегда равен собственному полу.
     "city": "Город",
     "district": "Район",
     "budget": "Бюджет",

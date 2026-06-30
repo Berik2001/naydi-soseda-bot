@@ -194,16 +194,10 @@ async def profile_location(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
 
 
-async def _ask_profile_district(call: CallbackQuery, state: FSMContext, city: str) -> None:
-    """Спросить район: кнопками для Алматы/Астаны, текстом — для остальных."""
-    if city in texts.DISTRICTS:
-        await state.set_state(None)  # район выберется кнопкой (pdist), отдельное состояние не нужно
-        await call.message.edit_text(
-            texts.ASK_DISTRICT, reply_markup=inline.profile_district_kb(city)
-        )
-    else:
-        await state.set_state(Edit.waiting_loc_district)
-        await call.message.edit_text(texts.ASK_DISTRICT_CUSTOM)
+async def _ask_profile_district(call: CallbackQuery, state: FSMContext) -> None:
+    """Район вводится текстом (пользователь пишет сам)."""
+    await state.set_state(Edit.waiting_loc_district)
+    await call.message.edit_text(texts.ASK_DISTRICT_CUSTOM)
 
 
 @router.callback_query(F.data.startswith("pcity:"))
@@ -215,7 +209,7 @@ async def profile_city_set(call: CallbackQuery, state: FSMContext) -> None:
         await call.answer()
         return
     await update_field(call.from_user.id, "city", value)
-    await _ask_profile_district(call, state, value)
+    await _ask_profile_district(call, state)
     await call.answer()
 
 
@@ -223,23 +217,9 @@ async def profile_city_set(call: CallbackQuery, state: FSMContext) -> None:
 async def profile_city_text(message: Message, state: FSMContext) -> None:
     city = message.text.strip()
     await update_field(message.from_user.id, "city", city)
-    # Для произвольного города район вводится текстом
+    # Район вводится текстом
     await state.set_state(Edit.waiting_loc_district)
     await message.answer(texts.ASK_DISTRICT_CUSTOM)
-
-
-@router.callback_query(F.data.startswith("pdist:"))
-async def profile_district_set(call: CallbackQuery, state: FSMContext) -> None:
-    value = call.data.split(":", 1)[1]
-    if value == "other":
-        await state.set_state(Edit.waiting_loc_district)
-        await call.message.edit_text(texts.ASK_DISTRICT_CUSTOM)
-        await call.answer()
-        return
-    await update_field(call.from_user.id, "district", value)
-    await state.clear()
-    await call.message.edit_text(texts.PROFILE_UPDATED)
-    await call.answer()
 
 
 @router.message(Edit.waiting_loc_district, F.text)

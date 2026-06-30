@@ -108,6 +108,30 @@ def test_profile_card_minimal_have_place():
     assert "тг" not in card        # строки бюджета нет
 
 
+def test_profile_card_registration_data_without_habit_keys():
+    """
+    Регресс: после регистрации данные FSM не содержат ключей smoking/pets
+    (эти шаги убраны). Карточка должна собираться без KeyError.
+    """
+    data = {
+        "full_name": "Серик",
+        "gender": "male",
+        "goal": "🔍 Нет жилья — ищу куда подселиться",
+        "role": "seeker",
+        "city": "Астана",
+        "district": "Есиль",
+        "budget": 30000,
+        "move_in": "📅 В течение 2 недель",
+        "occupation": "🏠 Фриланс",
+        "about": "Я не курю и не пью",
+    }
+    card = texts.profile_card(data)  # не должно бросать KeyError
+    assert "Серик" in card
+    assert "Астана, Есиль" in card
+    assert "💰 до 30 000 тг" in card
+    assert "Я не курю и не пью" in card
+
+
 def test_listing_card_provider():
     """Карточка объявления (сдаёт жильё)."""
     user = {

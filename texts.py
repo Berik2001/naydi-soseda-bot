@@ -68,8 +68,6 @@ ASK_BUDGET_RETRY = (
     "Например: до 100000"
 )
 ASK_MOVE_IN = "📅 Когда планируешь заехать?"
-ASK_SMOKING = "🚭 Куришь?"
-ASK_PETS = "🐾 Есть животные?"
 ASK_OCCUPATION = "💼 Ты:"
 ASK_PHOTO = (
     "📸 Пришли фото профиля.\n"

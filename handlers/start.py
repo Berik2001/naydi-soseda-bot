@@ -75,21 +75,15 @@ async def send_full_card(message: Message, user, reply_markup=None) -> None:
             media = [InputMediaPhoto(media=fid) for fid in photos]
             await message.answer_media_group(media)
         # Альбом не несёт кнопок, поэтому меню прикрепляем к тексту объявления
-        await message.answer(
-            texts.listing_card(user, header="🏠 Моё объявление"),
-            reply_markup=reply_markup,
-        )
+        await message.answer(texts.listing_card(user), reply_markup=reply_markup)
     elif user["photo_file_id"]:
         await message.answer_photo(
             photo=user["photo_file_id"],
-            caption=texts.profile_card(user, header="👤 Моя анкета"),
+            caption=texts.profile_card(user),
             reply_markup=reply_markup,
         )
     else:
-        await message.answer(
-            texts.profile_card(user, header="👤 Моя анкета"),
-            reply_markup=reply_markup,
-        )
+        await message.answer(texts.profile_card(user), reply_markup=reply_markup)
 
 
 # ---------- Пункты меню «Моя анкета» ----------

@@ -37,12 +37,12 @@ async def set_commands(bot: Bot) -> None:
     commands = [
         BotCommand(command="start", description="Начало / регистрация"),
         BotCommand(command="profile", description="Моя анкета"),
-        BotCommand(command="edit", description="Изменить анкету"),
         BotCommand(command="search", description="Найти сожителей"),
-        BotCommand(command="premium", description="⭐ Премиум"),
         BotCommand(command="pause", description="Скрыть анкету"),
         BotCommand(command="resume", description="Показать анкету"),
         BotCommand(command="help", description="Помощь"),
+        # /edit и /premium временно скрыты из меню (редактирование — внутри /profile,
+        # премиум пока бесплатный). Команды продолжают работать, если ввести вручную.
     ]
     await bot.set_my_commands(commands)
 

@@ -123,7 +123,7 @@ def profile_menu_kb(role: str | None) -> InlineKeyboardMarkup:
         builder.button(text="📸 Изменить фото", callback_data="profile:photo")
     builder.button(text="💰 Изменить цену", callback_data="profile:budget")
     builder.button(text="📍 Изменить город/район", callback_data="profile:location")
-    builder.button(text="⭐ Активировать премиум", callback_data="profile:premium")
+    # Кнопка премиума временно скрыта (пока премиум бесплатный)
     builder.adjust(1)
     return builder.as_markup()
 

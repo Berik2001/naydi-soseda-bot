@@ -243,72 +243,75 @@ def profile_card(user: dict) -> str:
     """
     Карточка анкеты. Сверху — цель пользователя. Показываются только заполненные поля.
 
+    Доступ к полям через .get(): объект приходит и как dict (данные FSM при
+    регистрации, где части ключей может не быть), и как asyncpg.Record (из БД).
     Значения в словарях (цель, режим заезда, занятость) уже содержат свой эмодзи,
     поэтому в карточке для них НЕ добавляем второй префикс — иначе дублируются смайлики.
     """
-    name = user["full_name"] or "Без имени"
-    gender = GENDER.get(user["gender"], "—")
+    name = user.get("full_name") or "Без имени"
+    gender = GENDER.get(user.get("gender"), "—")
 
     lines = []
     # Цель — заголовок карточки (значение уже с эмодзи 🔍/🏠)
-    if user["goal"]:
-        lines += [user["goal"], ""]
+    if user.get("goal"):
+        lines += [user.get("goal"), ""]
 
     lines.append(f"👤 {name}, {gender}")
 
     # Локация: город всегда, район — если указан
-    if user["district"]:
-        lines.append(f"📍 {user['city']}, {user['district']}")
-    elif user["city"]:
-        lines.append(f"📍 {user['city']}")
+    if user.get("district"):
+        lines.append(f"📍 {user.get('city')}, {user.get('district')}")
+    elif user.get("city"):
+        lines.append(f"📍 {user.get('city')}")
 
-    if user["budget"]:
+    if user.get("budget"):
         # Бюджет ищущего — это «до» (верхний предел)
-        lines.append(f"💰 до {format_budget(user['budget'])}")
-    if user["move_in"]:
-        lines.append(user["move_in"])  # уже с эмодзи
+        lines.append(f"💰 до {format_budget(user.get('budget'))}")
+    if user.get("move_in"):
+        lines.append(user.get("move_in"))  # уже с эмодзи
 
-    # Привычки в одну строку (значения уже с эмодзи, кроме курения)
+    # Привычки в одну строку (значения уже с эмодзи, кроме курения).
+    # Для старых анкет, где эти поля заполнены; новые анкеты их не содержат.
     habits = []
-    if user["smoking"]:
-        habits.append(f"🚭 {user['smoking']}")
-    if user["pets"]:
-        habits.append(user["pets"])
+    if user.get("smoking"):
+        habits.append(f"🚭 {user.get('smoking')}")
+    if user.get("pets"):
+        habits.append(user.get("pets"))
     if habits:
         lines.append(" | ".join(habits))
 
-    if user["occupation"]:
-        lines.append(user["occupation"])  # уже с эмодзи
+    if user.get("occupation"):
+        lines.append(user.get("occupation"))  # уже с эмодзи
 
     # «О себе» показываем всегда (с прочерком, если пусто)
-    lines.append(f"💬 «{user['about'] or '—'}»")
+    lines.append(f"💬 «{user.get('about') or '—'}»")
 
     return "\n".join(lines)
 
 
 def listing_card(user: dict, header: str | None = "🏠 Сдаётся жильё") -> str:
     """Карточка объявления (для роли provider — сдаёт/имеет жильё)."""
-    name = user["full_name"] or "Без имени"
-    gender = GENDER.get(user["gender"], "—")
+    name = user.get("full_name") or "Без имени"
+    gender = GENDER.get(user.get("gender"), "—")
 
     lines = []
     if header:
         lines += [header, ""]
     lines.append(f"👤 {name}, {gender}")
-    if user["district"]:
-        lines.append(f"📍 {user['city']}, {user['district']}")
-    elif user["city"]:
-        lines.append(f"📍 {user['city']}")
-    if user["preferred_gender"]:
-        lines.append(f"🤝 Сожитель: {PREFERRED_GENDER.get(user['preferred_gender'], '—')}")
-    if user["budget"]:
-        lines.append(f"💰 {format_budget(user['budget'])}/мес")
-    lines.append(f"💬 «{user['about'] or '—'}»")
+    if user.get("district"):
+        lines.append(f"📍 {user.get('city')}, {user.get('district')}")
+    elif user.get("city"):
+        lines.append(f"📍 {user.get('city')}")
+    if user.get("preferred_gender"):
+        lines.append(f"🤝 Сожитель: {PREFERRED_GENDER.get(user.get('preferred_gender'), '—')}")
+    if user.get("budget"):
+        lines.append(f"💰 {format_budget(user.get('budget'))}/мес")
+    lines.append(f"💬 «{user.get('about') or '—'}»")
     return "\n".join(lines)
 
 
 def user_card(user: dict) -> str:
     """Единая точка: для provider — объявление, иначе — анкета."""
-    if user["role"] == "provider":
+    if user.get("role") == "provider":
         return listing_card(user)
     return profile_card(user)

@@ -21,7 +21,7 @@ _photos_lock = asyncio.Lock()
 
 import texts
 from database.db import get_user, set_active, update_field
-from handlers.registration import start_registration
+from handlers.registration import refresh_done_button, start_registration
 from keyboards import inline
 from states.form import Edit
 from validators import is_valid_about, parse_budget
@@ -145,10 +145,8 @@ async def profile_about(call: CallbackQuery, state: FSMContext) -> None:
 @router.callback_query(F.data == "profile:apt_photos")
 async def profile_apt_photos(call: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(Edit.waiting_apartment_photos)
-    await state.update_data(apt_photos=[])
-    await call.message.answer(
-        texts.ASK_APARTMENT_PHOTOS, reply_markup=inline.photos_done_kb("aptphoto:done")
-    )
+    await state.update_data(apt_photos=[], done_msg_id=None)
+    await call.message.answer(texts.ASK_APARTMENT_PHOTOS)
     await call.answer()
 
 
@@ -161,7 +159,9 @@ async def edit_apt_photo(message: Message, state: FSMContext) -> None:
             return  # больше 10 не добавляем (молча)
         photos.append(message.photo[-1].file_id)
         await state.update_data(apt_photos=photos)
-    # На каждое фото не отвечаем — кнопка «Готово ✅» уже под приглашением.
+        await refresh_done_button(
+            message, state, "aptphoto:done", texts.photos_progress(len(photos))
+        )
 
 
 @router.callback_query(Edit.waiting_apartment_photos, F.data == "aptphoto:done")
@@ -171,6 +171,10 @@ async def edit_apt_photos_done(call: CallbackQuery, state: FSMContext) -> None:
     if not photos:
         await call.answer(texts.APARTMENT_PHOTOS_NEED_ONE, show_alert=True)
         return
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:  # noqa: BLE001
+        pass
     await update_field(call.from_user.id, "apartment_photos", photos)
     await state.clear()
     await call.message.answer(texts.PHOTO_UPDATED)
@@ -180,9 +184,7 @@ async def edit_apt_photos_done(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(Edit.waiting_apartment_photos)
 async def edit_apt_photos_wrong(message: Message) -> None:
-    await message.answer(
-        texts.ASK_APARTMENT_PHOTOS, reply_markup=inline.photos_done_kb("aptphoto:done")
-    )
+    await message.answer(texts.ASK_APARTMENT_PHOTOS)
 
 
 # ---------- Изменение медиа профиля (seeker: до 2 фото / 1 видео) ----------
@@ -190,8 +192,8 @@ async def edit_apt_photos_wrong(message: Message) -> None:
 @router.callback_query(F.data == "profile:photo")
 async def profile_photo(call: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(Edit.waiting_photo)
-    await state.update_data(new_media=[], new_media_type=None)
-    await call.message.answer(texts.ASK_PHOTO, reply_markup=inline.photos_done_kb("media:done"))
+    await state.update_data(new_media=[], new_media_type=None, done_msg_id=None)
+    await call.message.answer(texts.ASK_PHOTO)
     await call.answer()
 
 
@@ -208,7 +210,9 @@ async def profile_photo_set(message: Message, state: FSMContext) -> None:
             return
         media.append(message.photo[-1].file_id)
         await state.update_data(new_media=media, new_media_type="photo")
-    # На каждое фото не отвечаем — кнопка «Готово ✅» уже под приглашением.
+        await refresh_done_button(
+            message, state, "media:done", texts.photos_progress(len(media))
+        )
 
 
 @router.message(Edit.waiting_photo, F.video)
@@ -218,7 +222,7 @@ async def profile_video_set(message: Message, state: FSMContext) -> None:
         await message.answer(texts.MEDIA_VIDEO_AFTER_PHOTO)
         return
     await state.update_data(new_media=[message.video.file_id], new_media_type="video")
-    await message.answer(texts.MEDIA_VIDEO_ADDED)
+    await refresh_done_button(message, state, "media:done", texts.VIDEO_PROGRESS)
 
 
 @router.callback_query(Edit.waiting_photo, F.data == "media:done")
@@ -228,6 +232,10 @@ async def profile_media_done(call: CallbackQuery, state: FSMContext) -> None:
     if not media:
         await call.answer(texts.PHOTO_NEED_ONE, show_alert=True)
         return
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:  # noqa: BLE001
+        pass
     await update_field(call.from_user.id, "profile_media", media)
     await update_field(call.from_user.id, "profile_media_type", data.get("new_media_type"))
     await state.clear()
@@ -238,7 +246,7 @@ async def profile_media_done(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(Edit.waiting_photo)
 async def profile_photo_wrong(message: Message) -> None:
-    await message.answer(texts.PHOTO_NEED_ONE, reply_markup=inline.photos_done_kb("media:done"))
+    await message.answer(texts.PHOTO_NEED_ONE)
 
 
 # ---------- Изменение города / района ----------

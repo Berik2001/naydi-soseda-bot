@@ -32,6 +32,24 @@ def _is_provider(data: dict) -> bool:
     """Роль «сдаёт/имеет жильё»?"""
     return data.get("role") == "provider"
 
+
+async def refresh_done_button(message: Message, state: FSMContext, action: str, text: str) -> None:
+    """
+    Показать «плавающую» кнопку «Готово ✅» внизу: удаляем предыдущее
+    сообщение с кнопкой и отправляем новое — так кнопка всегда под последним
+    отправленным фото, а не уезжает вверх вместе с приглашением.
+    """
+    data = await state.get_data()
+    old_id = data.get("done_msg_id")
+    if old_id:
+        try:
+            await message.bot.delete_message(message.chat.id, old_id)
+        except Exception:  # noqa: BLE001 — сообщение могли удалить/его нет
+            pass
+    sent = await message.answer(text, reply_markup=inline.photos_done_kb(action))
+    await state.update_data(done_msg_id=sent.message_id)
+
+
 router = Router()
 
 
@@ -173,12 +191,9 @@ async def step_budget(message: Message, state: FSMContext) -> None:
     data = await state.get_data()
     if _is_provider(data):
         # Сдаю/есть жильё -> загрузка фото квартиры
-        await state.update_data(apartment_photos=[])
+        await state.update_data(apartment_photos=[], done_msg_id=None)
         await state.set_state(Form.apartment_photos)
-        await message.answer(
-            texts.ASK_APARTMENT_PHOTOS,
-            reply_markup=inline.photos_done_kb("aptphoto:done"),
-        )
+        await message.answer(texts.ASK_APARTMENT_PHOTOS)
     else:
         await state.set_state(Form.move_in)
         await message.answer(texts.ASK_MOVE_IN, reply_markup=inline.move_in_kb())
@@ -195,8 +210,10 @@ async def step_apartment_photo(message: Message, state: FSMContext) -> None:
             return  # больше 10 не добавляем (молча, без спама сообщениями)
         photos.append(message.photo[-1].file_id)
         await state.update_data(apartment_photos=photos)
-    # На каждое фото НЕ отвечаем: фото и так видно в чате, кнопка «Готово ✅»
-    # уже есть под приглашением.
+        # «Плавающая» кнопка «Готово ✅» со счётчиком — всегда под последним фото
+        await refresh_done_button(
+            message, state, "aptphoto:done", texts.photos_progress(len(photos))
+        )
 
 
 @router.callback_query(Form.apartment_photos, F.data == "aptphoto:done")
@@ -205,6 +222,11 @@ async def step_apartment_photos_done(call: CallbackQuery, state: FSMContext) -> 
     if not (data.get("apartment_photos") or []):
         await call.answer(texts.APARTMENT_PHOTOS_NEED_ONE, show_alert=True)
         return
+    # Убираем кнопку у плавающего сообщения (оставляем счётчик)
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:  # noqa: BLE001
+        pass
     await state.set_state(Form.listing_about)
     await call.message.answer(texts.ask_listing_desc(data.get("gender")))
     await call.answer()
@@ -212,8 +234,7 @@ async def step_apartment_photos_done(call: CallbackQuery, state: FSMContext) -> 
 
 @router.message(Form.apartment_photos)
 async def step_apartment_photos_wrong(message: Message) -> None:
-    await message.answer(texts.ASK_APARTMENT_PHOTOS,
-                         reply_markup=inline.photos_done_kb("aptphoto:done"))
+    await message.answer(texts.ASK_APARTMENT_PHOTOS)
 
 
 # ====================== ОБЪЯВЛЕНИЕ: ОПИСАНИЕ (сдаю, обязательно) ======================
@@ -254,12 +275,12 @@ async def step_move_in(call: CallbackQuery, state: FSMContext) -> None:
 async def step_occupation(call: CallbackQuery, state: FSMContext) -> None:
     key = call.data.split(":", 1)[1]
     await state.update_data(occupation=texts.OCCUPATION[key])
-    await state.update_data(profile_media=[], profile_media_type=None)
+    await state.update_data(profile_media=[], profile_media_type=None, done_msg_id=None)
     await state.set_state(Form.photo)
     # Фиксируем выбор занятости (убираем кнопки) и просим фото отдельным
-    # сообщением с inline-кнопкой «Готово ✅».
+    # сообщением. Кнопка «Готово ✅» появится «плавающей» под фото.
     await call.message.edit_text(texts.OCCUPATION[key])
-    await call.message.answer(texts.ASK_PHOTO, reply_markup=inline.photos_done_kb("media:done"))
+    await call.message.answer(texts.ASK_PHOTO)
     await call.answer()
 
 
@@ -279,7 +300,9 @@ async def step_photo(message: Message, state: FSMContext) -> None:
             return
         media.append(message.photo[-1].file_id)
         await state.update_data(profile_media=media, profile_media_type="photo")
-    # На каждое фото НЕ отвечаем — кнопка «Готово ✅» уже под приглашением.
+        await refresh_done_button(
+            message, state, "media:done", texts.photos_progress(len(media))
+        )
 
 
 @router.message(Form.photo, F.video)
@@ -289,7 +312,7 @@ async def step_video(message: Message, state: FSMContext) -> None:
         await message.answer(texts.MEDIA_VIDEO_AFTER_PHOTO)
         return
     await state.update_data(profile_media=[message.video.file_id], profile_media_type="video")
-    await message.answer(texts.MEDIA_VIDEO_ADDED)
+    await refresh_done_button(message, state, "media:done", texts.VIDEO_PROGRESS)
 
 
 @router.callback_query(Form.photo, F.data == "media:done")
@@ -298,6 +321,10 @@ async def step_photo_done(call: CallbackQuery, state: FSMContext) -> None:
     if not (data.get("profile_media") or []):
         await call.answer(texts.PHOTO_NEED_ONE, show_alert=True)
         return
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:  # noqa: BLE001
+        pass
     await state.set_state(Form.about)
     await call.message.answer(texts.ASK_ABOUT)
     await call.answer()
@@ -305,7 +332,7 @@ async def step_photo_done(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(Form.photo)
 async def step_photo_wrong(message: Message) -> None:
-    await message.answer(texts.PHOTO_NEED_ONE, reply_markup=inline.photos_done_kb("media:done"))
+    await message.answer(texts.PHOTO_NEED_ONE)
 
 
 # ====================== ШАГ 12 — О СЕБЕ (обязательно) ======================

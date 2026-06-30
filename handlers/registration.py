@@ -206,7 +206,7 @@ async def step_apartment_photos_done(call: CallbackQuery, state: FSMContext) -> 
         await call.answer(texts.APARTMENT_PHOTOS_NEED_ONE, show_alert=True)
         return
     await state.set_state(Form.listing_about)
-    await call.message.answer(texts.ASK_LISTING_DESC)
+    await call.message.answer(texts.ask_listing_desc(data.get("gender")))
     await call.answer()
 
 

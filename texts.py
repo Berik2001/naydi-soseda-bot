@@ -178,17 +178,15 @@ PREFERRED_GENDER = {
 
 # Остальные поля хранятся уже как текст — словари нужны для построения кнопок
 GOAL = {
-    "search": "🔍 Ищу комнату/квартиру",
-    "rent_out": "🏠 Сдаю комнату — ищу сожителя",
-    "have_place": "🤝 Есть жильё, ищу с кем жить",
+    "search": "🔍 Нет жилья — ищу куда подселиться",
+    "have_place": "🏠 Есть жильё — ищу соседа",
 }
 
 # Роль пользователя по выбранной цели:
 #  seeker   — ищет жильё (анкета о себе)
-#  provider — сдаёт / имеет жильё (объявление с фото квартиры)
+#  provider — имеет жильё (объявление с фото квартиры)
 GOAL_ROLE = {
     "search": "seeker",
-    "rent_out": "provider",
     "have_place": "provider",
 }
 
@@ -232,16 +230,20 @@ def format_budget(amount: int) -> str:
     return f"{amount:,}".replace(",", " ") + " тг"
 
 
-def profile_card(user: dict) -> str:
+def profile_card(user: dict, header: str | None = "✅ Твоя анкета готова!") -> str:
     """
     Красивая карточка анкеты. Показываются только заполненные поля —
     минимальная анкета (например, цель «есть жильё»: пол + город) тоже выглядит аккуратно.
+    header — заголовок карточки (None — без заголовка, например для чужих карточек в ленте).
     user — словарь/Record с полями таблицы users.
     """
     name = user["full_name"] or "Без имени"
     gender = GENDER.get(user["gender"], "—")
 
-    lines = ["✅ Твоя анкета готова!", "", f"👤 {name}, {gender}"]
+    lines = []
+    if header:
+        lines += [header, ""]
+    lines.append(f"👤 {name}, {gender}")
 
     # Локация: город всегда, район — если указан
     if user["district"]:
@@ -274,12 +276,15 @@ def profile_card(user: dict) -> str:
     return "\n".join(lines)
 
 
-def listing_card(user: dict) -> str:
+def listing_card(user: dict, header: str | None = "🏠 Сдаётся жильё") -> str:
     """Карточка объявления (для роли provider — сдаёт/имеет жильё)."""
     name = user["full_name"] or "Без имени"
     gender = GENDER.get(user["gender"], "—")
 
-    lines = ["🏠 Сдаётся жильё", "", f"👤 {name}, {gender}"]
+    lines = []
+    if header:
+        lines += [header, ""]
+    lines.append(f"👤 {name}, {gender}")
     if user["district"]:
         lines.append(f"📍 {user['city']}, {user['district']}")
     elif user["city"]:

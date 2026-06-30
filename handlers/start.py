@@ -63,26 +63,33 @@ async def cmd_profile(message: Message, state: FSMContext) -> None:
         await message.answer(texts.NO_PROFILE)
         return
     await state.clear()
-    await send_full_card(message, user)
-    await message.answer(
-        texts.PROFILE_MENU_TITLE, reply_markup=inline.profile_menu_kb(user["role"])
-    )
+    # Кнопки меню прикрепляем прямо к карточке — без отдельного сообщения
+    await send_full_card(message, user, reply_markup=inline.profile_menu_kb(user["role"]))
 
 
-async def send_full_card(message: Message, user) -> None:
-    """Показать полную карточку: объявление (с альбомом) для provider, иначе анкету."""
+async def send_full_card(message: Message, user, reply_markup=None) -> None:
+    """Показать полную карточку (своя анкета/объявление) с прикреплённым меню."""
     if user["role"] == "provider":
         photos = user["apartment_photos"] or []
         if photos:
             media = [InputMediaPhoto(media=fid) for fid in photos]
             await message.answer_media_group(media)
-        await message.answer(texts.listing_card(user))
+        # Альбом не несёт кнопок, поэтому меню прикрепляем к тексту объявления
+        await message.answer(
+            texts.listing_card(user, header="🏠 Моё объявление"),
+            reply_markup=reply_markup,
+        )
     elif user["photo_file_id"]:
         await message.answer_photo(
-            photo=user["photo_file_id"], caption=texts.profile_card(user)
+            photo=user["photo_file_id"],
+            caption=texts.profile_card(user, header="👤 Моя анкета"),
+            reply_markup=reply_markup,
         )
     else:
-        await message.answer(texts.profile_card(user))
+        await message.answer(
+            texts.profile_card(user, header="👤 Моя анкета"),
+            reply_markup=reply_markup,
+        )
 
 
 # ---------- Пункты меню «Моя анкета» ----------
@@ -320,6 +327,10 @@ async def edit_choice_set(call: CallbackQuery) -> None:
         value = _CHOICE_OPTIONS[field][key]  # остальные — текстом
 
     await update_field(call.from_user.id, field, value)
+    # Цель определяет роль (seeker/provider) — синхронизируем
+    if field == "goal":
+        await update_field(call.from_user.id, "role", texts.GOAL_ROLE[key])
+
     await call.message.edit_text("✅ Изменено!")
     await call.answer("Готово")
 

@@ -72,6 +72,18 @@ async def send_full_card(message: Message, user, reply_markup=None) -> None:
     await send_media_card(message, user, card, reply_markup=reply_markup)
 
 
+async def show_updated_profile(message: Message, telegram_id: int) -> None:
+    """
+    После любого редактирования — заново показать обновлённую анкету
+    с меню действий (как /profile), а не сухое «Изменено».
+    """
+    user = await get_user(telegram_id)
+    if user is None:
+        await message.answer(texts.NO_PROFILE)
+        return
+    await send_full_card(message, user, reply_markup=inline.profile_menu_kb(user["role"]))
+
+
 # ---------- Пункты меню «Моя анкета» ----------
 
 @router.callback_query(F.data == "profile:feed")
@@ -147,6 +159,7 @@ async def edit_apt_photos_done(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     await call.message.answer(texts.PHOTO_UPDATED)
     await call.answer()
+    await show_updated_profile(call.message, call.from_user.id)
 
 
 # ---------- Изменение медиа профиля (seeker: до 2 фото / 1 видео) ----------
@@ -196,6 +209,7 @@ async def profile_media_done(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     await call.message.answer(texts.PHOTO_UPDATED)
     await call.answer()
+    await show_updated_profile(call.message, call.from_user.id)
 
 
 @router.message(Edit.waiting_photo)
@@ -245,6 +259,7 @@ async def profile_district_text(message: Message, state: FSMContext) -> None:
     await update_field(message.from_user.id, "district", message.text.strip())
     await state.clear()
     await message.answer(texts.PROFILE_UPDATED)
+    await show_updated_profile(message, message.from_user.id)
 
 
 # ====================== /pause и /resume ======================
@@ -328,6 +343,7 @@ async def edit_choice_set(call: CallbackQuery) -> None:
 
     await call.message.edit_text("✅ Изменено!")
     await call.answer("Готово")
+    await show_updated_profile(call.message, call.from_user.id)
 
 
 @router.message(Edit.waiting_value, F.text)
@@ -354,3 +370,4 @@ async def edit_text_set(message: Message, state: FSMContext) -> None:
     await update_field(message.from_user.id, field, value)
     await state.clear()
     await message.answer("✅ Изменено!")
+    await show_updated_profile(message, message.from_user.id)

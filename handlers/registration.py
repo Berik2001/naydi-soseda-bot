@@ -91,7 +91,10 @@ async def step_goal(call: CallbackQuery, state: FSMContext) -> None:
         preferred_gender=data.get("gender"),
     )
     await state.set_state(Form.city)
-    await call.message.edit_text(texts.ASK_CITY, reply_markup=inline.city_kb())
+    # Фиксируем выбор цели (убираем кнопки) и спрашиваем город ОТДЕЛЬНЫМ
+    # сообщением, чтобы шаг с городом был виден и не перезаписывался районом.
+    await call.message.edit_text(texts.GOAL[key])
+    await call.message.answer(texts.ASK_CITY, reply_markup=inline.city_kb())
     await call.answer()
 
 
@@ -108,7 +111,10 @@ async def step_city(call: CallbackQuery, state: FSMContext) -> None:
         return
 
     await state.update_data(city=value)
-    await _ask_district(call.message, state, value, edit=True)
+    # Фиксируем выбранный город (убираем кнопки) и спрашиваем район
+    # ОТДЕЛЬНЫМ сообщением — чтобы город остался виден в переписке.
+    await call.message.edit_text(f"📍 {value}")
+    await _ask_district(call.message, state)
     await call.answer()
 
 
@@ -116,16 +122,14 @@ async def step_city(call: CallbackQuery, state: FSMContext) -> None:
 async def step_city_custom(message: Message, state: FSMContext) -> None:
     city = message.text.strip()
     await state.update_data(city=city)
-    await _ask_district(message, state, city, edit=False)
+    await _ask_district(message, state)
 
 
-async def _ask_district(message: Message, state: FSMContext, city: str, edit: bool):
-    """Шаг 5 — район всегда вводится текстом (пользователь пишет сам)."""
+async def _ask_district(message: Message, state: FSMContext):
+    """Шаг 5 — район всегда вводится текстом (пользователь пишет сам).
+    Всегда отправляем новым сообщением, чтобы предыдущий шаг не перезаписывался."""
     await state.set_state(Form.district_custom)
-    if edit:
-        await message.edit_text(texts.ASK_DISTRICT_CUSTOM)
-    else:
-        await message.answer(texts.ASK_DISTRICT_CUSTOM)
+    await message.answer(texts.ASK_DISTRICT_CUSTOM)
 
 
 # ====================== ШАГ 5 — РАЙОН (текст) ======================

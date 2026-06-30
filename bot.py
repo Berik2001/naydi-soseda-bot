@@ -33,16 +33,14 @@ logger = logging.getLogger(__name__)
 
 
 async def set_commands(bot: Bot) -> None:
-    """Меню команд бота (кнопка «/» в Telegram)."""
+    """
+    Меню команд бота (кнопка «/» в Telegram).
+    Показываем только «Моя анкета». Остальные команды
+    (/start, /search, /pause, /resume, /help, /edit, /premium) работают,
+    если ввести вручную, но в меню не отображаются.
+    """
     commands = [
-        BotCommand(command="start", description="Начало / регистрация"),
         BotCommand(command="profile", description="Моя анкета"),
-        BotCommand(command="search", description="Найти сожителей"),
-        BotCommand(command="pause", description="Скрыть анкету"),
-        BotCommand(command="resume", description="Показать анкету"),
-        BotCommand(command="help", description="Помощь"),
-        # /edit и /premium временно скрыты из меню (редактирование — внутри /profile,
-        # премиум пока бесплатный). Команды продолжают работать, если ввести вручную.
     ]
     await bot.set_my_commands(commands)
 

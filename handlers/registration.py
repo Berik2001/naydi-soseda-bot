@@ -319,40 +319,27 @@ async def step_about_wrong(message: Message) -> None:
     await message.answer(texts.SEND_TEXT)
 
 
-# ====================== ПОКАЗ КАРТОЧКИ/ОБЪЯВЛЕНИЯ ======================
+# ====================== СОХРАНЕНИЕ И ПОКАЗ АНКЕТЫ ======================
 
 async def _show_card_preview(message: Message, state: FSMContext) -> None:
-    """Собрать данные и показать карточку (анкету или объявление) с кнопками."""
-    data = await state.get_data()
-    await state.set_state(Form.confirm)
-    await message.answer(texts.PREVIEW_INTRO)
-
-    card = texts.listing_card(data) if _is_provider(data) else texts.profile_card(data)
-    await send_media_card(message, data, card, reply_markup=inline.confirm_kb())
-
-
-@router.callback_query(Form.confirm, F.data == "confirm:save")
-async def confirm_save(call: CallbackQuery, state: FSMContext) -> None:
-    """Сохранить анкету в БД."""
+    """
+    Финал регистрации: сразу сохраняем анкету и показываем её
+    с обычным меню действий (как /profile). Без шага подтверждения.
+    """
     data = await state.get_data()
     # Дополняем данными из Telegram-профиля.
     # full_name НЕ трогаем — там имя, которое пользователь ввёл сам.
-    data["telegram_id"] = call.from_user.id
-    data["username"] = call.from_user.username
-    data.setdefault("full_name", call.from_user.full_name)
+    data["telegram_id"] = message.from_user.id
+    data["username"] = message.from_user.username
+    data.setdefault("full_name", message.from_user.full_name)
 
     await upsert_user(data)
     await state.clear()
-    await call.message.answer(texts.PROFILE_SAVED)
-    await call.answer("Сохранено ✅")
 
-
-@router.callback_query(Form.confirm, F.data == "confirm:restart")
-async def confirm_restart(call: CallbackQuery, state: FSMContext) -> None:
-    """Заполнить анкету заново."""
-    await call.message.answer(texts.PROFILE_RESTART)
-    await start_registration(call.message, state, call.from_user)
-    await call.answer()
+    card = texts.listing_card(data) if _is_provider(data) else texts.profile_card(data)
+    await send_media_card(
+        message, data, card, reply_markup=inline.profile_menu_kb(data.get("role"))
+    )
 
 
 # ====================== ОБРАБОТКА НЕВЕРНОГО ВВОДА ======================

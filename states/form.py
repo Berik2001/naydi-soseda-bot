@@ -9,23 +9,18 @@ from aiogram.fsm.state import State, StatesGroup
 class Form(StatesGroup):
     """Шаги последовательной анкеты (регистрация)."""
     gender = State()            # Шаг 1 — пол
-    name = State()              # Шаг 1.5 — имя
-    goal = State()              # Шаг 2 — цель
-    preferred_gender = State()  # Шаг 3 — предпочтение по полу сожителя
+    name = State()              # Шаг 2 — имя
+    goal = State()              # Шаг 3 — цель
     city = State()              # Шаг 4 — город (кнопки)
     city_custom = State()       # Шаг 4 — ввод другого города текстом
-    district = State()          # Шаг 5 — район (кнопки)
-    district_custom = State()   # Шаг 5 — ввод другого района текстом
+    district_custom = State()   # Шаг 5 — район (ввод текстом)
     budget = State()            # Шаг 6 — бюджет (ищу) / цена аренды (сдаю)
     apartment_photos = State()  # сдаю: фото квартиры (до 10)
     listing_about = State()     # сдаю: описание объявления
     move_in = State()           # Шаг 7 — когда нужно
-    smoking = State()           # Шаг 8 — курение
-    pets = State()              # Шаг 9 — животные
-    occupation = State()        # Шаг 10 — занятость
-    photo = State()             # Шаг 12 — фото
-    about = State()             # Шаг 13 — о себе
-    confirm = State()           # Шаг 14 — подтверждение анкеты
+    occupation = State()        # Шаг 8 — занятость
+    photo = State()             # Шаг 9 — фото
+    about = State()             # Шаг 10 — о себе
 
 
 class Edit(StatesGroup):

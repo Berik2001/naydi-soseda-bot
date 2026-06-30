@@ -72,15 +72,6 @@ def skip_about_kb() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def confirm_kb() -> InlineKeyboardMarkup:
-    """Шаг 14 — сохранить / заполнить заново."""
-    builder = InlineKeyboardBuilder()
-    builder.button(text="✅ Сохранить анкету", callback_data="confirm:save")
-    builder.button(text="✏️ Заполнить заново", callback_data="confirm:restart")
-    builder.adjust(1)
-    return builder.as_markup()
-
-
 # ====================== МЭТЧИНГ ======================
 
 def match_kb(candidate_id: int) -> InlineKeyboardMarkup:

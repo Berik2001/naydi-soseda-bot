@@ -10,7 +10,7 @@ import asyncio
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
+from aiogram.types import CallbackQuery, Message
 
 import texts
 from database.db import upsert_user
@@ -176,7 +176,8 @@ async def step_budget(message: Message, state: FSMContext) -> None:
         await state.update_data(apartment_photos=[])
         await state.set_state(Form.apartment_photos)
         await message.answer(
-            texts.ASK_APARTMENT_PHOTOS, reply_markup=inline.photos_done_kb()
+            texts.ASK_APARTMENT_PHOTOS,
+            reply_markup=inline.photos_done_kb("aptphoto:done"),
         )
     else:
         await state.set_state(Form.move_in)
@@ -184,19 +185,6 @@ async def step_budget(message: Message, state: FSMContext) -> None:
 
 
 # ====================== ОБЪЯВЛЕНИЕ: ФОТО КВАРТИРЫ (сдаю) ======================
-
-@router.message(Form.apartment_photos, F.text == texts.PHOTOS_DONE_BTN)
-async def step_apartment_photos_done(message: Message, state: FSMContext) -> None:
-    data = await state.get_data()
-    if not (data.get("apartment_photos") or []):
-        await message.answer(
-            texts.APARTMENT_PHOTOS_NEED_ONE, reply_markup=inline.photos_done_kb()
-        )
-        return
-    await state.set_state(Form.listing_about)
-    # Убираем нижнюю клавиатуру — дальше обычный текстовый ввод
-    await message.answer(texts.ASK_LISTING_DESC, reply_markup=ReplyKeyboardRemove())
-
 
 @router.message(Form.apartment_photos, F.photo)
 async def step_apartment_photo(message: Message, state: FSMContext) -> None:
@@ -207,13 +195,25 @@ async def step_apartment_photo(message: Message, state: FSMContext) -> None:
             return  # больше 10 не добавляем (молча, без спама сообщениями)
         photos.append(message.photo[-1].file_id)
         await state.update_data(apartment_photos=photos)
-    # На каждое фото НЕ отвечаем: фото и так видно в чате, а «Готово ✅» снизу.
+    # На каждое фото НЕ отвечаем: фото и так видно в чате, кнопка «Готово ✅»
+    # уже есть под приглашением.
+
+
+@router.callback_query(Form.apartment_photos, F.data == "aptphoto:done")
+async def step_apartment_photos_done(call: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    if not (data.get("apartment_photos") or []):
+        await call.answer(texts.APARTMENT_PHOTOS_NEED_ONE, show_alert=True)
+        return
+    await state.set_state(Form.listing_about)
+    await call.message.answer(texts.ASK_LISTING_DESC)
+    await call.answer()
 
 
 @router.message(Form.apartment_photos)
 async def step_apartment_photos_wrong(message: Message) -> None:
     await message.answer(texts.ASK_APARTMENT_PHOTOS,
-                         reply_markup=inline.photos_done_kb())
+                         reply_markup=inline.photos_done_kb("aptphoto:done"))
 
 
 # ====================== ОБЪЯВЛЕНИЕ: ОПИСАНИЕ (сдаю, обязательно) ======================
@@ -257,24 +257,13 @@ async def step_occupation(call: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(profile_media=[], profile_media_type=None)
     await state.set_state(Form.photo)
     # Фиксируем выбор занятости (убираем кнопки) и просим фото отдельным
-    # сообщением с нижней клавиатурой «Готово ✅».
+    # сообщением с inline-кнопкой «Готово ✅».
     await call.message.edit_text(texts.OCCUPATION[key])
-    await call.message.answer(texts.ASK_PHOTO, reply_markup=inline.photos_done_kb())
+    await call.message.answer(texts.ASK_PHOTO, reply_markup=inline.photos_done_kb("media:done"))
     await call.answer()
 
 
-# ====================== ШАГ 11 — ФОТО / ВИДЕО (обязательно) ======================
-
-@router.message(Form.photo, F.text == texts.PHOTOS_DONE_BTN)
-async def step_photo_done(message: Message, state: FSMContext) -> None:
-    data = await state.get_data()
-    if not (data.get("profile_media") or []):
-        await message.answer(texts.PHOTO_NEED_ONE, reply_markup=inline.photos_done_kb())
-        return
-    await state.set_state(Form.about)
-    # Убираем нижнюю клавиатуру — дальше обычный текстовый ввод
-    await message.answer(texts.ASK_ABOUT, reply_markup=ReplyKeyboardRemove())
-
+# ====================== ШАГ 9 — ФОТО / ВИДЕО (обязательно) ======================
 
 @router.message(Form.photo, F.photo)
 async def step_photo(message: Message, state: FSMContext) -> None:
@@ -290,7 +279,7 @@ async def step_photo(message: Message, state: FSMContext) -> None:
             return
         media.append(message.photo[-1].file_id)
         await state.update_data(profile_media=media, profile_media_type="photo")
-    # На каждое фото НЕ отвечаем — кнопка «Готово ✅» снизу.
+    # На каждое фото НЕ отвечаем — кнопка «Готово ✅» уже под приглашением.
 
 
 @router.message(Form.photo, F.video)
@@ -303,9 +292,20 @@ async def step_video(message: Message, state: FSMContext) -> None:
     await message.answer(texts.MEDIA_VIDEO_ADDED)
 
 
+@router.callback_query(Form.photo, F.data == "media:done")
+async def step_photo_done(call: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    if not (data.get("profile_media") or []):
+        await call.answer(texts.PHOTO_NEED_ONE, show_alert=True)
+        return
+    await state.set_state(Form.about)
+    await call.message.answer(texts.ASK_ABOUT)
+    await call.answer()
+
+
 @router.message(Form.photo)
 async def step_photo_wrong(message: Message) -> None:
-    await message.answer(texts.PHOTO_NEED_ONE, reply_markup=inline.photos_done_kb())
+    await message.answer(texts.PHOTO_NEED_ONE, reply_markup=inline.photos_done_kb("media:done"))
 
 
 # ====================== ШАГ 12 — О СЕБЕ (обязательно) ======================

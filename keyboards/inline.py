@@ -58,18 +58,8 @@ def move_in_kb() -> InlineKeyboardMarkup:
     return _kb_from_dict("move", texts.MOVE_IN, width=1)
 
 
-def smoking_kb() -> InlineKeyboardMarkup:
-    """Шаг 8 — курение (по одной кнопке в ряд, чтобы текст не обрезался)."""
-    return _kb_from_dict("smoke", texts.SMOKING, width=1)
-
-
-def pets_kb() -> InlineKeyboardMarkup:
-    """Шаг 9 — животные."""
-    return _kb_from_dict("pets", texts.PETS, width=1)
-
-
 def occupation_kb() -> InlineKeyboardMarkup:
-    """Шаг 11 — занятость."""
+    """Шаг 8 — занятость."""
     return _kb_from_dict("occ", texts.OCCUPATION, width=1)
 
 
@@ -180,8 +170,6 @@ EDIT_FIELDS = {
     "district": "Район",
     "budget": "Бюджет",
     "move_in": "Когда нужно",
-    "smoking": "Курение",
-    "pets": "Животные",
     "occupation": "Занятость",
     "about": "О себе",
 }

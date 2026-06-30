@@ -239,34 +239,13 @@ async def step_listing_about_wrong(message: Message) -> None:
 async def step_move_in(call: CallbackQuery, state: FSMContext) -> None:
     key = call.data.split(":", 1)[1]
     await state.update_data(move_in=texts.MOVE_IN[key])
-    await state.set_state(Form.smoking)
-    await call.message.edit_text(texts.ASK_SMOKING, reply_markup=inline.smoking_kb())
-    await call.answer()
-
-
-# ====================== ШАГ 8 — КУРЕНИЕ ======================
-
-@router.callback_query(Form.smoking, F.data.startswith("smoke:"))
-async def step_smoking(call: CallbackQuery, state: FSMContext) -> None:
-    key = call.data.split(":", 1)[1]
-    await state.update_data(smoking=texts.SMOKING[key])
-    await state.set_state(Form.pets)
-    await call.message.edit_text(texts.ASK_PETS, reply_markup=inline.pets_kb())
-    await call.answer()
-
-
-# ====================== ШАГ 9 — ЖИВОТНЫЕ ======================
-
-@router.callback_query(Form.pets, F.data.startswith("pets:"))
-async def step_pets(call: CallbackQuery, state: FSMContext) -> None:
-    key = call.data.split(":", 1)[1]
-    await state.update_data(pets=texts.PETS[key])
+    # Курение и животные больше не спрашиваем — сразу к занятости.
     await state.set_state(Form.occupation)
     await call.message.edit_text(texts.ASK_OCCUPATION, reply_markup=inline.occupation_kb())
     await call.answer()
 
 
-# ====================== ШАГ 10 — ЗАНЯТОСТЬ ======================
+# ====================== ШАГ 8 — ЗАНЯТОСТЬ ======================
 
 @router.callback_query(Form.occupation, F.data.startswith("occ:"))
 async def step_occupation(call: CallbackQuery, state: FSMContext) -> None:
@@ -386,8 +365,6 @@ async def confirm_restart(call: CallbackQuery, state: FSMContext) -> None:
 @router.message(Form.preferred_gender)
 @router.message(Form.city)
 @router.message(Form.move_in)
-@router.message(Form.smoking)
-@router.message(Form.pets)
 @router.message(Form.occupation)
 async def wrong_input_button(message: Message) -> None:
     await message.answer(texts.PRESS_BUTTON)

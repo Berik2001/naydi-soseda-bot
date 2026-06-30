@@ -34,8 +34,6 @@ _CHOICE_OPTIONS = {
     "preferred_gender": texts.PREFERRED_GENDER,
     "goal": texts.GOAL,
     "move_in": texts.MOVE_IN,
-    "smoking": texts.SMOKING,
-    "pets": texts.PETS,
     "occupation": texts.OCCUPATION,
 }
 

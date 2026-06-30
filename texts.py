@@ -41,8 +41,13 @@ NAME_TOO_LONG = "🚫 Слишком длинное имя. Максимум 50 
 ASK_GOAL = "Что тебе нужно?"
 ASK_CITY = "В каком городе?"
 ASK_CITY_CUSTOM = "✍️ Напиши название города:"
-ASK_DISTRICT = "✍️ Напиши район, где ищешь:"
-ASK_DISTRICT_CUSTOM = "✍️ Напиши район, где ищешь:"
+ASK_DISTRICT_SEEKER = "✍️ Напиши район, где ищешь:"
+ASK_DISTRICT_PROVIDER = "✍️ Напиши район, где живёшь:"
+
+
+def ask_district(role: str | None) -> str:
+    """Текст вопроса про район: сдающему — «где живёшь», ищущему — «где ищешь»."""
+    return ASK_DISTRICT_PROVIDER if role == "provider" else ASK_DISTRICT_SEEKER
 ASK_BUDGET = "💰 Укажи свой бюджет в месяц:\n(Например: до 100000)"
 # Объявление (сдаю / есть жильё)
 ASK_PRICE = "💰 Укажи цену аренды в месяц:\n(Например: 150000)"

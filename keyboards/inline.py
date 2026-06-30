@@ -59,8 +59,8 @@ def move_in_kb() -> InlineKeyboardMarkup:
 
 
 def smoking_kb() -> InlineKeyboardMarkup:
-    """Шаг 8 — курение."""
-    return _kb_from_dict("smoke", texts.SMOKING, width=3)
+    """Шаг 8 — курение (по одной кнопке в ряд, чтобы текст не обрезался)."""
+    return _kb_from_dict("smoke", texts.SMOKING, width=1)
 
 
 def pets_kb() -> InlineKeyboardMarkup:
@@ -132,6 +132,13 @@ def apartment_photos_done_kb() -> InlineKeyboardMarkup:
     """Кнопка завершения загрузки фото квартиры."""
     builder = InlineKeyboardBuilder()
     builder.button(text="Готово ✅", callback_data="aptphoto:done")
+    return builder.as_markup()
+
+
+def media_done_kb() -> InlineKeyboardMarkup:
+    """Кнопка завершения загрузки медиа профиля (фото/видео ищущего)."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Готово ✅", callback_data="media:done")
     return builder.as_markup()
 
 

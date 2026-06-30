@@ -6,7 +6,9 @@
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InputMediaPhoto, Message
+from aiogram.types import CallbackQuery, Message
+
+from handlers.render import send_media_card
 
 # Максимум фото квартиры (как в регистрации)
 MAX_APARTMENT_PHOTOS = 10
@@ -69,21 +71,8 @@ async def cmd_profile(message: Message, state: FSMContext) -> None:
 
 async def send_full_card(message: Message, user, reply_markup=None) -> None:
     """Показать полную карточку (своя анкета/объявление) с прикреплённым меню."""
-    if user["role"] == "provider":
-        photos = user["apartment_photos"] or []
-        if photos:
-            media = [InputMediaPhoto(media=fid) for fid in photos]
-            await message.answer_media_group(media)
-        # Альбом не несёт кнопок, поэтому меню прикрепляем к тексту объявления
-        await message.answer(texts.listing_card(user), reply_markup=reply_markup)
-    elif user["photo_file_id"]:
-        await message.answer_photo(
-            photo=user["photo_file_id"],
-            caption=texts.profile_card(user),
-            reply_markup=reply_markup,
-        )
-    else:
-        await message.answer(texts.profile_card(user), reply_markup=reply_markup)
+    card = texts.listing_card(user) if user["role"] == "provider" else texts.profile_card(user)
+    await send_media_card(message, user, card, reply_markup=reply_markup)
 
 
 # ---------- Пункты меню «Моя анкета» ----------
@@ -163,26 +152,58 @@ async def edit_apt_photos_done(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
 
 
-# ---------- Изменение фото ----------
+# ---------- Изменение медиа профиля (seeker: до 2 фото / 1 видео) ----------
 
 @router.callback_query(F.data == "profile:photo")
 async def profile_photo(call: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(Edit.waiting_photo)
-    await call.message.answer(texts.ASK_NEW_PHOTO)
+    await state.update_data(new_media=[], new_media_type=None)
+    await call.message.answer(texts.ASK_PHOTO, reply_markup=inline.media_done_kb())
     await call.answer()
 
 
 @router.message(Edit.waiting_photo, F.photo)
 async def profile_photo_set(message: Message, state: FSMContext) -> None:
-    file_id = message.photo[-1].file_id
-    await update_field(message.from_user.id, "photo_file_id", file_id)
+    data = await state.get_data()
+    media = list(data.get("new_media") or [])
+    if data.get("new_media_type") == "video":
+        await message.answer(texts.MEDIA_PHOTO_AFTER_VIDEO, reply_markup=inline.media_done_kb())
+        return
+    if len(media) >= 2:
+        await message.answer(texts.PHOTO_MAX_TWO, reply_markup=inline.media_done_kb())
+        return
+    media.append(message.photo[-1].file_id)
+    await state.update_data(new_media=media, new_media_type="photo")
+    await message.answer(texts.photo_added(len(media)), reply_markup=inline.media_done_kb())
+
+
+@router.message(Edit.waiting_photo, F.video)
+async def profile_video_set(message: Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    if data.get("new_media") and data.get("new_media_type") == "photo":
+        await message.answer(texts.MEDIA_VIDEO_AFTER_PHOTO, reply_markup=inline.media_done_kb())
+        return
+    await state.update_data(new_media=[message.video.file_id], new_media_type="video")
+    await message.answer(texts.MEDIA_VIDEO_ADDED, reply_markup=inline.media_done_kb())
+
+
+@router.callback_query(Edit.waiting_photo, F.data == "media:done")
+async def profile_media_done(call: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    media = data.get("new_media") or []
+    if not media:
+        await call.answer(texts.PHOTO_NEED_ONE, show_alert=True)
+        return
+    await update_field(call.from_user.id, "profile_media", media)
+    await update_field(call.from_user.id, "profile_media_type", data.get("new_media_type"))
     await state.clear()
-    await message.answer(texts.PHOTO_UPDATED)
+    await call.message.answer(texts.PHOTO_UPDATED)
+    await call.answer()
 
 
 @router.message(Edit.waiting_photo)
 async def profile_photo_wrong(message: Message) -> None:
-    await message.answer(texts.SEND_PHOTO_PLEASE)
+    await message.answer(texts.PHOTO_NEED_ONE, reply_markup=inline.media_done_kb())
 
 
 # ---------- Изменение города / района ----------

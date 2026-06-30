@@ -5,7 +5,9 @@
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
-from aiogram.types import CallbackQuery, InputMediaPhoto, Message
+from aiogram.types import CallbackQuery, Message
+
+from handlers.render import send_media_card
 
 import texts
 from database.db import (
@@ -48,28 +50,14 @@ async def start_search(message: Message, viewer) -> None:
 
 
 async def _send_candidate(message: Message, candidate) -> None:
-    """Показать карточку кандидата с кнопками действий.
-
-    Объявление (provider) — альбом фото квартиры + текст с кнопками.
-    Анкета (seeker) — фото (если есть) + текст с кнопками.
-    """
-    cid = candidate["telegram_id"]
-    kb = inline.match_kb(cid)
-
-    if candidate["role"] == "provider":
-        photos = candidate["apartment_photos"] or []
-        if photos:
-            media = [InputMediaPhoto(media=fid) for fid in photos]
-            await message.answer_media_group(media)
-        await message.answer(texts.listing_card(candidate), reply_markup=kb)
-    elif candidate["photo_file_id"]:
-        await message.answer_photo(
-            photo=candidate["photo_file_id"],
-            caption=texts.profile_card(candidate),
-            reply_markup=kb,
-        )
-    else:
-        await message.answer(texts.profile_card(candidate), reply_markup=kb)
+    """Показать карточку кандидата с кнопками действий (через общий рендер)."""
+    kb = inline.match_kb(candidate["telegram_id"])
+    card = (
+        texts.listing_card(candidate)
+        if candidate["role"] == "provider"
+        else texts.profile_card(candidate)
+    )
+    await send_media_card(message, candidate, card, reply_markup=kb)
 
 
 async def _show_next(message: Message, viewer_id: int) -> None:

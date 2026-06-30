@@ -53,16 +53,6 @@ def city_kb() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def district_kb(city: str) -> InlineKeyboardMarkup:
-    """Шаг 5 — район (зависит от города)."""
-    builder = InlineKeyboardBuilder()
-    for district in texts.DISTRICTS.get(city, []):
-        builder.button(text=district, callback_data=f"dist:{district}")
-    builder.button(text="Другой ✍️", callback_data="dist:other")
-    builder.adjust(2)
-    return builder.as_markup()
-
-
 def move_in_kb() -> InlineKeyboardMarkup:
     """Шаг 7 — когда нужно."""
     return _kb_from_dict("move", texts.MOVE_IN, width=1)
@@ -151,16 +141,6 @@ def profile_city_kb() -> InlineKeyboardMarkup:
     for city in texts.CITIES:
         builder.button(text=city, callback_data=f"pcity:{city}")
     builder.button(text="Другой город ✍️", callback_data="pcity:other")
-    builder.adjust(2)
-    return builder.as_markup()
-
-
-def profile_district_kb(city: str) -> InlineKeyboardMarkup:
-    """Выбор района при редактировании через меню анкеты (зависит от города)."""
-    builder = InlineKeyboardBuilder()
-    for district in texts.DISTRICTS.get(city, []):
-        builder.button(text=district, callback_data=f"pdist:{district}")
-    builder.button(text="Другой ✍️", callback_data="pdist:other")
     builder.adjust(2)
     return builder.as_markup()
 

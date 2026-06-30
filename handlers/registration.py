@@ -125,38 +125,15 @@ async def step_city_custom(message: Message, state: FSMContext) -> None:
 
 
 async def _ask_district(message: Message, state: FSMContext, city: str, edit: bool):
-    """Шаг 5 — спросить район. Для Алматы/Астаны — кнопки, иначе текст."""
-    if city in texts.DISTRICTS:
-        await state.set_state(Form.district)
-        kb = inline.district_kb(city)
-        if edit:
-            await message.edit_text(texts.ASK_DISTRICT, reply_markup=kb)
-        else:
-            await message.answer(texts.ASK_DISTRICT, reply_markup=kb)
+    """Шаг 5 — район всегда вводится текстом (пользователь пишет сам)."""
+    await state.set_state(Form.district_custom)
+    if edit:
+        await message.edit_text(texts.ASK_DISTRICT_CUSTOM)
     else:
-        # Другой город — сразу текстовый ввод района
-        await state.set_state(Form.district_custom)
-        if edit:
-            await message.edit_text(texts.ASK_DISTRICT_CUSTOM)
-        else:
-            await message.answer(texts.ASK_DISTRICT_CUSTOM)
+        await message.answer(texts.ASK_DISTRICT_CUSTOM)
 
 
-# ====================== ШАГ 5 — РАЙОН ======================
-
-@router.callback_query(Form.district, F.data.startswith("dist:"))
-async def step_district(call: CallbackQuery, state: FSMContext) -> None:
-    value = call.data.split(":", 1)[1]
-    if value == "other":
-        await state.set_state(Form.district_custom)
-        await call.message.edit_text(texts.ASK_DISTRICT_CUSTOM)
-        await call.answer()
-        return
-
-    await state.update_data(district=value)
-    await _ask_budget_or_price(call.message, state, edit=True)
-    await call.answer()
-
+# ====================== ШАГ 5 — РАЙОН (текст) ======================
 
 @router.message(Form.district_custom, F.text)
 async def step_district_custom(message: Message, state: FSMContext) -> None:
@@ -392,7 +369,6 @@ async def confirm_restart(call: CallbackQuery, state: FSMContext) -> None:
 @router.message(Form.goal)
 @router.message(Form.preferred_gender)
 @router.message(Form.city)
-@router.message(Form.district)
 @router.message(Form.move_in)
 @router.message(Form.smoking)
 @router.message(Form.pets)

@@ -63,6 +63,12 @@ def test_profile_card_male_gender():
     assert "👨 Парень" in card
 
 
+def test_profile_card_budget_shows_up_to():
+    """Бюджет ищущего показывается как «до X»."""
+    card = texts.profile_card(_sample_user(budget=10000))
+    assert "💰 до 10 000 тг" in card
+
+
 def test_profile_card_goal_on_top_no_duplicate_emojis():
     """Цель сверху, без дублирующихся префиксов-эмодзи."""
     user = _sample_user(

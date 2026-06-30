@@ -81,27 +81,21 @@ async def step_name_wrong(message: Message) -> None:
 @router.callback_query(Form.goal, F.data.startswith("goal:"))
 async def step_goal(call: CallbackQuery, state: FSMContext) -> None:
     key = call.data.split(":", 1)[1]
-    # Сохраняем цель текстом и роль (seeker / provider)
-    await state.update_data(goal=texts.GOAL[key], role=texts.GOAL_ROLE[key])
-    await state.set_state(Form.preferred_gender)
-    await call.message.edit_text(
-        texts.ASK_PREFERRED_GENDER, reply_markup=inline.preferred_gender_kb()
+    data = await state.get_data()
+    # Сохраняем цель текстом и роль (seeker / provider).
+    # «С кем жить» больше не спрашиваем: пол сожителя = собственному полу
+    # (парень живёт с парнями, девушка — с девушками).
+    await state.update_data(
+        goal=texts.GOAL[key],
+        role=texts.GOAL_ROLE[key],
+        preferred_gender=data.get("gender"),
     )
-    await call.answer()
-
-
-# ====================== ШАГ 3 — ПРЕДПОЧТЕНИЕ ПО ПОЛУ ======================
-
-@router.callback_query(Form.preferred_gender, F.data.startswith("pref:"))
-async def step_preferred_gender(call: CallbackQuery, state: FSMContext) -> None:
-    value = call.data.split(":", 1)[1]  # female / male / any
-    await state.update_data(preferred_gender=value)
     await state.set_state(Form.city)
     await call.message.edit_text(texts.ASK_CITY, reply_markup=inline.city_kb())
     await call.answer()
 
 
-# ====================== ШАГ 4 — ГОРОД ======================
+# ====================== ШАГ 3 — ГОРОД ======================
 
 @router.callback_query(Form.city, F.data.startswith("city:"))
 async def step_city(call: CallbackQuery, state: FSMContext) -> None:
@@ -362,7 +356,6 @@ async def confirm_restart(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(Form.gender)
 @router.message(Form.goal)
-@router.message(Form.preferred_gender)
 @router.message(Form.city)
 @router.message(Form.move_in)
 @router.message(Form.occupation)

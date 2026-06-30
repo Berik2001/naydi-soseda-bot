@@ -31,7 +31,6 @@ _KEY_FIELDS = {"gender", "preferred_gender"}
 # Какой словарь использовать для клавиатуры выбора при редактировании
 _CHOICE_OPTIONS = {
     "gender": texts.GENDER,
-    "preferred_gender": texts.PREFERRED_GENDER,
     "goal": texts.GOAL,
     "move_in": texts.MOVE_IN,
     "occupation": texts.OCCUPATION,
@@ -323,6 +322,9 @@ async def edit_choice_set(call: CallbackQuery) -> None:
     # Цель определяет роль (seeker/provider) — синхронизируем
     if field == "goal":
         await update_field(call.from_user.id, "role", texts.GOAL_ROLE[key])
+    # Пол сожителя всегда равен собственному полу — синхронизируем при смене пола
+    if field == "gender":
+        await update_field(call.from_user.id, "preferred_gender", key)
 
     await call.message.edit_text("✅ Изменено!")
     await call.answer("Готово")

@@ -71,4 +71,8 @@ MIGRATIONS = [
     # Бэкфилл роли для уже существующих анкет (по тексту цели)
     "UPDATE users SET role = 'seeker' WHERE role IS NULL AND goal LIKE '%Ищу комнату%'",
     "UPDATE users SET role = 'provider' WHERE role IS NULL AND goal IS NOT NULL",
+    # Пол сожителя теперь всегда равен собственному полу (парни с парнями,
+    # девушки с девушками). Приводим старые анкеты, где стояло 'any' или иное.
+    "UPDATE users SET preferred_gender = gender "
+    "WHERE gender IS NOT NULL AND preferred_gender IS DISTINCT FROM gender",
 ]

@@ -237,8 +237,10 @@ async def profile_location(call: CallbackQuery, state: FSMContext) -> None:
 
 async def _ask_profile_district(call: CallbackQuery, state: FSMContext) -> None:
     """Район вводится текстом (пользователь пишет сам)."""
+    user = await get_user(call.from_user.id)
+    role = user["role"] if user else None
     await state.set_state(Edit.waiting_loc_district)
-    await call.message.edit_text(texts.ASK_DISTRICT_CUSTOM)
+    await call.message.edit_text(texts.ask_district(role))
 
 
 @router.callback_query(F.data.startswith("pcity:"))
@@ -258,9 +260,11 @@ async def profile_city_set(call: CallbackQuery, state: FSMContext) -> None:
 async def profile_city_text(message: Message, state: FSMContext) -> None:
     city = message.text.strip()
     await update_field(message.from_user.id, "city", city)
+    user = await get_user(message.from_user.id)
+    role = user["role"] if user else None
     # Район вводится текстом
     await state.set_state(Edit.waiting_loc_district)
-    await message.answer(texts.ASK_DISTRICT_CUSTOM)
+    await message.answer(texts.ask_district(role))
 
 
 @router.message(Edit.waiting_loc_district, F.text)
@@ -315,12 +319,15 @@ async def edit_field_chosen(call: CallbackQuery, state: FSMContext) -> None:
         # Поле редактируется текстом — ждём ввод
         await state.set_state(Edit.waiting_value)
         await state.update_data(edit_field=field)
-        prompt = {
-            "city": texts.ASK_CITY_CUSTOM,
-            "district": texts.ASK_DISTRICT_CUSTOM,
-            "budget": texts.ASK_BUDGET,
-            "about": texts.ASK_ABOUT,
-        }[field]
+        if field == "district":
+            user = await get_user(call.from_user.id)
+            prompt = texts.ask_district(user["role"] if user else None)
+        else:
+            prompt = {
+                "city": texts.ASK_CITY_CUSTOM,
+                "budget": texts.ASK_BUDGET,
+                "about": texts.ASK_ABOUT,
+            }[field]
         await call.message.edit_text(prompt)
     else:
         # Поле-выбор — показываем клавиатуру вариантов

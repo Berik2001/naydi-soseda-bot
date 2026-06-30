@@ -128,8 +128,9 @@ async def step_city_custom(message: Message, state: FSMContext) -> None:
 async def _ask_district(message: Message, state: FSMContext):
     """Шаг 5 — район всегда вводится текстом (пользователь пишет сам).
     Всегда отправляем новым сообщением, чтобы предыдущий шаг не перезаписывался."""
+    data = await state.get_data()
     await state.set_state(Form.district_custom)
-    await message.answer(texts.ASK_DISTRICT_CUSTOM)
+    await message.answer(texts.ask_district(data.get("role")))
 
 
 # ====================== ШАГ 5 — РАЙОН (текст) ======================

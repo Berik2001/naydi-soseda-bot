@@ -8,10 +8,11 @@
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InputMediaPhoto, Message
+from aiogram.types import CallbackQuery, Message
 
 import texts
 from database.db import upsert_user
+from handlers.render import send_media_card
 from keyboards import inline
 from states.form import Form
 from validators import is_valid_about, parse_budget
@@ -202,7 +203,7 @@ async def step_apartment_photos_done(call: CallbackQuery, state: FSMContext) -> 
         await call.answer(texts.APARTMENT_PHOTOS_NEED_ONE, show_alert=True)
         return
     await state.set_state(Form.listing_about)
-    await call.message.answer(texts.ASK_LISTING_DESC, reply_markup=inline.skip_about_kb())
+    await call.message.answer(texts.ASK_LISTING_DESC)
     await call.answer()
 
 
@@ -212,11 +213,14 @@ async def step_apartment_photos_wrong(message: Message) -> None:
                          reply_markup=inline.apartment_photos_done_kb())
 
 
-# ====================== ОБЪЯВЛЕНИЕ: ОПИСАНИЕ (сдаю) ======================
+# ====================== ОБЪЯВЛЕНИЕ: ОПИСАНИЕ (сдаю, обязательно) ======================
 
 @router.message(Form.listing_about, F.text)
 async def step_listing_about(message: Message, state: FSMContext) -> None:
     text = message.text.strip()
+    if not text:
+        await message.answer(texts.ABOUT_EMPTY)
+        return
     if not is_valid_about(text):
         await message.answer(texts.ABOUT_TOO_LONG)
         return
@@ -224,11 +228,9 @@ async def step_listing_about(message: Message, state: FSMContext) -> None:
     await _show_card_preview(message, state)
 
 
-@router.callback_query(Form.listing_about, F.data == "skip:about")
-async def step_listing_about_skip(call: CallbackQuery, state: FSMContext) -> None:
-    await state.update_data(about=None)
-    await _show_card_preview(call.message, state)
-    await call.answer()
+@router.message(Form.listing_about)
+async def step_listing_about_wrong(message: Message) -> None:
+    await message.answer(texts.SEND_TEXT)
 
 
 # ====================== ШАГ 7 — КОГДА НУЖНО ======================
@@ -270,35 +272,64 @@ async def step_pets(call: CallbackQuery, state: FSMContext) -> None:
 async def step_occupation(call: CallbackQuery, state: FSMContext) -> None:
     key = call.data.split(":", 1)[1]
     await state.update_data(occupation=texts.OCCUPATION[key])
+    await state.update_data(profile_media=[], profile_media_type=None)
     await state.set_state(Form.photo)
-    await call.message.edit_text(texts.ASK_PHOTO, reply_markup=inline.skip_photo_kb())
+    await call.message.edit_text(texts.ASK_PHOTO, reply_markup=inline.media_done_kb())
     await call.answer()
 
 
-# ====================== ШАГ 11 — ФОТО ======================
+# ====================== ШАГ 11 — ФОТО / ВИДЕО (обязательно) ======================
 
 @router.message(Form.photo, F.photo)
 async def step_photo(message: Message, state: FSMContext) -> None:
-    # Берём самое большое по размеру фото
-    file_id = message.photo[-1].file_id
-    await state.update_data(photo_file_id=file_id)
-    await state.set_state(Form.about)
-    await message.answer(texts.ASK_ABOUT, reply_markup=inline.skip_about_kb())
+    data = await state.get_data()
+    media = list(data.get("profile_media") or [])
+    mtype = data.get("profile_media_type")
+    if mtype == "video":
+        await message.answer(texts.MEDIA_PHOTO_AFTER_VIDEO, reply_markup=inline.media_done_kb())
+        return
+    if len(media) >= 2:
+        await message.answer(texts.PHOTO_MAX_TWO, reply_markup=inline.media_done_kb())
+        return
+    media.append(message.photo[-1].file_id)
+    await state.update_data(profile_media=media, profile_media_type="photo")
+    await message.answer(texts.photo_added(len(media)), reply_markup=inline.media_done_kb())
 
 
-@router.callback_query(Form.photo, F.data == "skip:photo")
-async def step_photo_skip(call: CallbackQuery, state: FSMContext) -> None:
-    await state.update_data(photo_file_id=None)
+@router.message(Form.photo, F.video)
+async def step_video(message: Message, state: FSMContext) -> None:
+    data = await state.get_data()
+    if data.get("profile_media") and data.get("profile_media_type") == "photo":
+        await message.answer(texts.MEDIA_VIDEO_AFTER_PHOTO, reply_markup=inline.media_done_kb())
+        return
+    await state.update_data(profile_media=[message.video.file_id], profile_media_type="video")
+    await message.answer(texts.MEDIA_VIDEO_ADDED, reply_markup=inline.media_done_kb())
+
+
+@router.callback_query(Form.photo, F.data == "media:done")
+async def step_photo_done(call: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    if not (data.get("profile_media") or []):
+        await call.answer(texts.PHOTO_NEED_ONE, show_alert=True)
+        return
     await state.set_state(Form.about)
-    await call.message.edit_text(texts.ASK_ABOUT, reply_markup=inline.skip_about_kb())
+    await call.message.answer(texts.ASK_ABOUT)
     await call.answer()
 
 
-# ====================== ШАГ 12 — О СЕБЕ ======================
+@router.message(Form.photo)
+async def step_photo_wrong(message: Message) -> None:
+    await message.answer(texts.PHOTO_NEED_ONE, reply_markup=inline.media_done_kb())
+
+
+# ====================== ШАГ 12 — О СЕБЕ (обязательно) ======================
 
 @router.message(Form.about, F.text)
 async def step_about(message: Message, state: FSMContext) -> None:
     text = message.text.strip()
+    if not text:
+        await message.answer(texts.ABOUT_EMPTY)
+        return
     if not is_valid_about(text):
         await message.answer(texts.ABOUT_TOO_LONG)
         return
@@ -306,11 +337,9 @@ async def step_about(message: Message, state: FSMContext) -> None:
     await _show_card_preview(message, state)
 
 
-@router.callback_query(Form.about, F.data == "skip:about")
-async def step_about_skip(call: CallbackQuery, state: FSMContext) -> None:
-    await state.update_data(about=None)
-    await _show_card_preview(call.message, state)
-    await call.answer()
+@router.message(Form.about)
+async def step_about_wrong(message: Message) -> None:
+    await message.answer(texts.SEND_TEXT)
 
 
 # ====================== ПОКАЗ КАРТОЧКИ/ОБЪЯВЛЕНИЯ ======================
@@ -321,21 +350,8 @@ async def _show_card_preview(message: Message, state: FSMContext) -> None:
     await state.set_state(Form.confirm)
     await message.answer(texts.PREVIEW_INTRO)
 
-    if _is_provider(data):
-        # Объявление: альбом фото квартиры + текст
-        photos = data.get("apartment_photos") or []
-        if photos:
-            media = [InputMediaPhoto(media=fid) for fid in photos]
-            await message.answer_media_group(media)
-        await message.answer(texts.listing_card(data), reply_markup=inline.confirm_kb())
-    elif data.get("photo_file_id"):
-        await message.answer_photo(
-            photo=data["photo_file_id"],
-            caption=texts.profile_card(data),
-            reply_markup=inline.confirm_kb(),
-        )
-    else:
-        await message.answer(texts.profile_card(data), reply_markup=inline.confirm_kb())
+    card = texts.listing_card(data) if _is_provider(data) else texts.profile_card(data)
+    await send_media_card(message, data, card, reply_markup=inline.confirm_kb())
 
 
 @router.callback_query(Form.confirm, F.data == "confirm:save")
@@ -375,8 +391,3 @@ async def confirm_restart(call: CallbackQuery, state: FSMContext) -> None:
 @router.message(Form.occupation)
 async def wrong_input_button(message: Message) -> None:
     await message.answer(texts.PRESS_BUTTON)
-
-
-@router.message(Form.photo)
-async def wrong_input_photo(message: Message) -> None:
-    await message.answer(texts.SEND_PHOTO_OR_SKIP)

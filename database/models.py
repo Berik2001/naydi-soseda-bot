@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS users (
     about           TEXT,
     role            TEXT,
     apartment_photos TEXT[],
+    profile_media       TEXT[],
+    profile_media_type  TEXT,
     is_active       BOOLEAN DEFAULT TRUE,
     is_premium      BOOLEAN DEFAULT FALSE,
     premium_until   TIMESTAMP,
@@ -64,6 +66,8 @@ MIGRATIONS = [
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_until TIMESTAMP",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS apartment_photos TEXT[]",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_media TEXT[]",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_media_type TEXT",
     # Бэкфилл роли для уже существующих анкет (по тексту цели)
     "UPDATE users SET role = 'seeker' WHERE role IS NULL AND goal LIKE '%Ищу комнату%'",
     "UPDATE users SET role = 'provider' WHERE role IS NULL AND goal IS NOT NULL",

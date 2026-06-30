@@ -74,13 +74,14 @@ async def upsert_user(data: dict) -> None:
                 telegram_id, username, full_name, gender, goal,
                 preferred_gender, city, district, budget, move_in,
                 smoking, pets, occupation, photo_file_id,
-                about, role, apartment_photos, is_active
+                about, role, apartment_photos,
+                profile_media, profile_media_type, is_active
             )
             VALUES (
                 $1, $2, $3, $4, $5,
                 $6, $7, $8, $9, $10,
                 $11, $12, $13, $14, $15,
-                $16, $17, TRUE
+                $16, $17, $18, $19, TRUE
             )
             ON CONFLICT (telegram_id) DO UPDATE SET
                 username = EXCLUDED.username,
@@ -99,6 +100,8 @@ async def upsert_user(data: dict) -> None:
                 about = EXCLUDED.about,
                 role = EXCLUDED.role,
                 apartment_photos = EXCLUDED.apartment_photos,
+                profile_media = EXCLUDED.profile_media,
+                profile_media_type = EXCLUDED.profile_media_type,
                 is_active = TRUE
             """,
             data["telegram_id"], data.get("username"), data.get("full_name"),
@@ -108,6 +111,7 @@ async def upsert_user(data: dict) -> None:
             data.get("occupation"),
             data.get("photo_file_id"), data.get("about"),
             data.get("role"), data.get("apartment_photos"),
+            data.get("profile_media"), data.get("profile_media_type"),
         )
 
 
@@ -120,7 +124,7 @@ async def update_field(telegram_id: int, field: str, value) -> None:
         "gender", "goal", "preferred_gender", "city", "district",
         "budget", "move_in", "smoking", "pets",
         "occupation", "photo_file_id", "about",
-        "role", "apartment_photos",
+        "role", "apartment_photos", "profile_media", "profile_media_type",
     }
     if field not in allowed:
         raise ValueError(f"Недопустимое поле: {field}")

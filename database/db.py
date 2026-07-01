@@ -151,25 +151,22 @@ async def get_next_candidate(viewer: asyncpg.Record) -> asyncpg.Record | None:
     """
     Найти следующего подходящего кандидата для viewer.
 
-    Фильтры:
+    Фильтры (без бюджета):
       1. Тот же город
       2. Пол кандидата совпадает с preferred_gender смотрящего
-      3. Бюджет «по карману»: ищущий должен потянуть цену жилья
-         (бюджет ищущего >= цена жилья сдающего)
-      4. Противоположная роль (ищущий видит объявления, сдающий — анкеты)
-      5. Не сам пользователь и не показанные ранее
-      6. Кандидат активен
+         (парни видят парней, девушки — девушек)
+      3. Противоположная роль (ищущий видит объявления, сдающий — анкеты)
+      4. Не сам пользователь и не показанные ранее
+      5. Кандидат активен
     """
     pool = get_pool()
-    viewer_budget = viewer["budget"]  # у ищущего — макс. бюджет, у сдающего — цена
-    viewer_role = viewer["role"]
     pref = viewer["preferred_gender"]
     # Показываем противоположную роль: ищущим — объявления (provider),
     # сдающим — анкеты (seeker). Если роль неизвестна — показываем всех.
     opposite = None
-    if viewer_role == "seeker":
+    if viewer["role"] == "seeker":
         opposite = "provider"
-    elif viewer_role == "provider":
+    elif viewer["role"] == "provider":
         opposite = "seeker"
 
     async with pool.acquire() as conn:
@@ -181,17 +178,7 @@ async def get_next_candidate(viewer: asyncpg.Record) -> asyncpg.Record | None:
               AND u.city = $2
               AND ($3 = 'any' OR u.gender = $3)
               -- противоположная роль (если у смотрящего роль задана)
-              AND ($5::text IS NULL OR u.role = $5)
-              -- Бюджет «по карману» (в обоих случаях: бюджет ищущего >= цена жилья):
-              --   ищущий видит жильё с ценой <= своего бюджета;
-              --   сдающий видит тех, чей бюджет >= его цены.
-              AND (
-                    u.budget IS NULL
-                 OR $4::int IS NULL
-                 OR $6::text IS NULL
-                 OR ($6 = 'seeker'   AND u.budget <= $4)
-                 OR ($6 = 'provider' AND u.budget >= $4)
-              )
+              AND ($4::text IS NULL OR u.role = $4)
               AND NOT EXISTS (
                     SELECT 1 FROM views v
                     WHERE v.viewer_id = $1 AND v.viewed_id = u.telegram_id
@@ -201,8 +188,7 @@ async def get_next_candidate(viewer: asyncpg.Record) -> asyncpg.Record | None:
                      u.created_at DESC
             LIMIT 1
             """,
-            viewer["telegram_id"], viewer["city"], pref,
-            viewer_budget, opposite, viewer_role,
+            viewer["telegram_id"], viewer["city"], pref, opposite,
         )
 
 

@@ -8,7 +8,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from handlers.render import send_media_card
+from handlers.render import send_media_card, send_media_card_to_chat
 
 import texts
 from database.db import (
@@ -107,9 +107,54 @@ async def _process_like(call: CallbackQuery, bot: Bot, is_super: bool) -> None:
 
     # Проверяем взаимность: лайкнул ли кандидат смотрящего ранее
     if await has_like(candidate_id, viewer_id):
+        # Оба лайкнули друг друга → мэтч, шлём контакт обоим
         await _notify_match(bot, viewer_id, candidate_id)
+    else:
+        # Иначе сразу уведомляем кандидата: «тебя лайкнули» + его выбор
+        await _notify_incoming_like(bot, viewer_id, candidate_id, is_super)
 
     await _show_next(call.message, viewer_id)
+
+
+async def _notify_incoming_like(bot: Bot, liker_id: int, target_id: int,
+                                is_super: bool) -> None:
+    """Показать получателю анкету лайкнувшего и кнопки принять/отказаться."""
+    liker = await get_user(liker_id)
+    if liker is None:
+        return
+    header = texts.incoming_like_header(is_super)
+    caption = f"{header}\n\n{texts.user_card(liker)}"
+    try:
+        await send_media_card_to_chat(
+            bot, target_id, liker, caption,
+            reply_markup=inline.incoming_like_kb(liker_id),
+        )
+    except Exception:
+        # Получатель мог заблокировать бота / не начинал диалог — игнорируем
+        pass
+
+
+# ====================== ВХОДЯЩИЙ ЛАЙК: ПРИНЯТЬ / ОТКАЗАТЬСЯ ======================
+
+@router.callback_query(F.data.startswith("accept:"))
+async def on_accept(call: CallbackQuery, bot: Bot) -> None:
+    """«Перейти к переписке» — лайк в ответ, что даёт мэтч и контакт обоим."""
+    liker_id = int(call.data.split(":", 1)[1])
+    me = call.from_user.id
+    await add_view(me, liker_id)
+    await add_like(me, liker_id, is_super=False)
+    await _remove_buttons(call)
+    await call.answer(texts.MATCH_ACCEPTED)
+    await _notify_match(bot, me, liker_id)
+
+
+@router.callback_query(F.data.startswith("decline:"))
+async def on_decline(call: CallbackQuery) -> None:
+    """«Отказаться» — помечаем лайкнувшего просмотренным, больше не показываем."""
+    liker_id = int(call.data.split(":", 1)[1])
+    await add_view(call.from_user.id, liker_id)
+    await _remove_buttons(call)
+    await call.answer(texts.MATCH_DECLINED)
 
 
 async def _notify_match(bot: Bot, user_a: int, user_b: int) -> None:

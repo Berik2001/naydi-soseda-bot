@@ -187,3 +187,16 @@ def test_match_message_with_username():
     msg = texts.match_message("Аружан", "aruzhan", 555)
     assert "@aruzhan" in msg
     assert '<a href="tg://user?id=555">Аружан</a>' in msg
+
+
+# ---------------------- incoming_like_header ----------------------
+
+def test_incoming_like_header_like():
+    header = texts.incoming_like_header(is_super=False)
+    assert "лайк" in header.lower() or "понрав" in header.lower()
+    assert "СУПЕР" not in header
+
+
+def test_incoming_like_header_superlike():
+    header = texts.incoming_like_header(is_super=True)
+    assert "СУПЕР" in header

@@ -26,14 +26,16 @@ def _get(obj, key):
         return None
 
 
-async def send_media_card(message: Message, user, card_text: str, reply_markup=None) -> None:
+async def _render(user, card_text, reply_markup, *,
+                  send_text, send_photo, send_video, send_album) -> None:
     """
-    Отправить карточку с медиа и (опционально) кнопками.
+    Общая логика отрисовки карточки. Способ отправки задаётся колбэками —
+    так один и тот же рендер работает и через message.answer_* (ответ в чат),
+    и через bot.send_* (уведомление другому пользователю).
 
     Правила отображения:
-    - 2–10 фото → media group (альбом): Telegram показывает их компактной
-      сеткой, как в каналах объявлений. Кнопки/текст идут отдельным сообщением,
-      т.к. у альбома не может быть inline-клавиатуры.
+    - 2–10 фото → media group (альбом): компактная сетка. Кнопки/текст идут
+      отдельным сообщением, т.к. у альбома не может быть inline-клавиатуры.
     - ровно 1 фото → обычное фото с подписью (одиночное фото Telegram всегда
       показывает крупно — это его поведение, через Bot API не уменьшить).
     - видео → видео с подписью.
@@ -54,7 +56,7 @@ async def send_media_card(message: Message, user, card_text: str, reply_markup=N
         mtype = "photo"
 
     if mtype == "video" and media:
-        await message.answer_video(media[0], caption=card_text, reply_markup=reply_markup)
+        await send_video(media[0], card_text, reply_markup)
     elif mtype == "photo" and len(media) >= 2:
         # Альбом: текст карточки — подписью к первому фото (текст и фото вместе,
         # фото компактной сеткой). Кнопки у media group невозможны, поэтому
@@ -65,10 +67,36 @@ async def send_media_card(message: Message, user, card_text: str, reply_markup=N
                 album.append(InputMediaPhoto(media=f, caption=card_text))
             else:
                 album.append(InputMediaPhoto(media=f))
-        await message.answer_media_group(album)
+        await send_album(album)
         if reply_markup is not None:
-            await message.answer(ACTIONS_LABEL, reply_markup=reply_markup)
+            await send_text(ACTIONS_LABEL, reply_markup)
     elif mtype == "photo" and len(media) == 1:
-        await message.answer_photo(media[0], caption=card_text, reply_markup=reply_markup)
+        await send_photo(media[0], card_text, reply_markup)
     else:
-        await message.answer(card_text, reply_markup=reply_markup)
+        await send_text(card_text, reply_markup)
+
+
+async def send_media_card(message: Message, user, card_text: str, reply_markup=None) -> None:
+    """Отправить карточку с медиа и кнопками в ответ на сообщение."""
+    await _render(
+        user, card_text, reply_markup,
+        send_text=lambda t, m: message.answer(t, reply_markup=m),
+        send_photo=lambda f, c, m: message.answer_photo(f, caption=c, reply_markup=m),
+        send_video=lambda f, c, m: message.answer_video(f, caption=c, reply_markup=m),
+        send_album=lambda a: message.answer_media_group(a),
+    )
+
+
+async def send_media_card_to_chat(bot, chat_id: int, user, card_text: str,
+                                  reply_markup=None) -> None:
+    """
+    То же, но отправка инициируется ботом в конкретный чат — для уведомлений
+    (например, «тебя лайкнули»), когда получатель сейчас ничего боту не писал.
+    """
+    await _render(
+        user, card_text, reply_markup,
+        send_text=lambda t, m: bot.send_message(chat_id, t, reply_markup=m),
+        send_photo=lambda f, c, m: bot.send_photo(chat_id, f, caption=c, reply_markup=m),
+        send_video=lambda f, c, m: bot.send_video(chat_id, f, caption=c, reply_markup=m),
+        send_album=lambda a: bot.send_media_group(chat_id, a),
+    )

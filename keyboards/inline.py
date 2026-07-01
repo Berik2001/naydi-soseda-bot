@@ -74,6 +74,18 @@ def match_kb(candidate_id: int) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def incoming_like_kb(liker_id: int) -> InlineKeyboardMarkup:
+    """
+    Кнопки под уведомлением «тебя лайкнули»:
+    «перейти к переписке» = лайк в ответ (мэтч), «отказаться» = пропустить.
+    """
+    builder = InlineKeyboardBuilder()
+    builder.button(text="💬 Перейти к переписке", callback_data=f"accept:{liker_id}")
+    builder.button(text="👎 Отказаться", callback_data=f"decline:{liker_id}")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 # ====================== МЕНЮ «МОЯ АНКЕТА» (/profile) ======================
 
 def profile_menu_kb(role: str | None) -> InlineKeyboardMarkup:

@@ -17,9 +17,6 @@ BUDGET_MAX = 5_000_000
 # Максимальная длина текста «о себе» / описания жилья
 ABOUT_MAX_LEN = 2000
 
-# Допустимая разница в бюджете при мэтчинге (±30%)
-BUDGET_TOLERANCE = 0.3
-
 
 def parse_budget(raw: str) -> int | None:
     """
@@ -49,14 +46,3 @@ def parse_budget(raw: str) -> int | None:
 def is_valid_about(text: str) -> bool:
     """Проверить, что текст «о себе» не длиннее лимита."""
     return len(text) <= ABOUT_MAX_LEN
-
-
-def budget_range(budget: int) -> tuple[int, int]:
-    """
-    Вернуть диапазон допустимых бюджетов кандидата для мэтчинга (±30%).
-    Например, для 100000 -> (70000, 130000).
-    """
-    budget = budget or 0
-    low = int(budget * (1 - BUDGET_TOLERANCE))
-    high = int(budget * (1 + BUDGET_TOLERANCE))
-    return low, high

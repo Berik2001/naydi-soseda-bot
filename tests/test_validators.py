@@ -7,7 +7,6 @@ from validators import (
     ABOUT_MAX_LEN,
     BUDGET_MAX,
     BUDGET_MIN,
-    budget_range,
     is_valid_about,
     parse_budget,
 )
@@ -86,36 +85,3 @@ def test_about_exactly_at_limit():
 
 def test_about_over_limit_rejected():
     assert is_valid_about("a" * (ABOUT_MAX_LEN + 1)) is False
-
-
-# ---------------------- budget_range ----------------------
-
-def test_budget_range_basic():
-    # ±30% от 100000
-    assert budget_range(100000) == (70000, 130000)
-
-
-def test_budget_range_zero():
-    assert budget_range(0) == (0, 0)
-
-
-def test_budget_range_none_treated_as_zero():
-    assert budget_range(None) == (0, 0)
-
-
-def test_budget_range_symmetry():
-    low, high = budget_range(200000)
-    assert low == 140000
-    assert high == 260000
-
-
-def test_budget_range_candidate_within():
-    # Кандидат с бюджетом 120000 должен попадать в диапазон смотрящего со 100000
-    low, high = budget_range(100000)
-    assert low <= 120000 <= high
-
-
-def test_budget_range_candidate_outside():
-    # Кандидат с бюджетом 150000 НЕ попадает в диапазон смотрящего со 100000
-    low, high = budget_range(100000)
-    assert not (low <= 150000 <= high)

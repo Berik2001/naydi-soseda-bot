@@ -59,12 +59,15 @@ async def main() -> None:
     bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher(storage=MemoryStorage())
 
-    # Подключаем роутеры. Порядок важен: сначала регистрация (FSM),
-    # затем команды и мэтчинг.
-    dp.include_router(registration.router)
+    # Порядок важен: сначала роутеры с командами (start/matching/premium),
+    # чтобы /profile, /start, /search и т.д. работали ДАЖЕ во время
+    # регистрации. Иначе FSM-хендлеры регистрации перехватывают команды как
+    # «неверный ввод». Регистрация — последней: её обработчики привязаны к
+    # состояниям Form.* и ловят только «свои» сообщения.
     dp.include_router(start.router)
     dp.include_router(matching.router)
     dp.include_router(premium.router)
+    dp.include_router(registration.router)
 
     await set_commands(bot)
 

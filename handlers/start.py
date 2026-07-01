@@ -56,7 +56,8 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
 # ====================== /help ======================
 
 @router.message(Command("help"))
-async def cmd_help(message: Message) -> None:
+async def cmd_help(message: Message, state: FSMContext) -> None:
+    await state.clear()  # команда прерывает незавершённую регистрацию
     await message.answer(texts.HELP)
 
 
@@ -300,7 +301,8 @@ async def profile_district_text(message: Message, state: FSMContext) -> None:
 # ====================== /pause и /resume ======================
 
 @router.message(Command("pause"))
-async def cmd_pause(message: Message) -> None:
+async def cmd_pause(message: Message, state: FSMContext) -> None:
+    await state.clear()
     user = await get_user(message.from_user.id)
     if user is None:
         await message.answer(texts.NO_PROFILE)
@@ -310,7 +312,8 @@ async def cmd_pause(message: Message) -> None:
 
 
 @router.message(Command("resume"))
-async def cmd_resume(message: Message) -> None:
+async def cmd_resume(message: Message, state: FSMContext) -> None:
+    await state.clear()
     user = await get_user(message.from_user.id)
     if user is None:
         await message.answer(texts.NO_PROFILE)

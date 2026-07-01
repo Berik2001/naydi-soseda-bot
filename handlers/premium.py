@@ -10,6 +10,7 @@
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 from aiogram.types import (
     CallbackQuery,
     LabeledPrice,
@@ -60,8 +61,9 @@ async def open_premium(call: CallbackQuery) -> None:
 
 
 @router.message(Command("premium"))
-async def cmd_premium(message: Message) -> None:
+async def cmd_premium(message: Message, state: FSMContext) -> None:
     """Команда /premium."""
+    await state.clear()  # команда прерывает незавершённую регистрацию
     await _show_premium_screen(message, message.from_user.id)
 
 

@@ -5,6 +5,7 @@
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from handlers.render import send_media_card
@@ -25,8 +26,9 @@ router = Router()
 # ====================== /search ======================
 
 @router.message(Command("search"))
-async def cmd_search(message: Message) -> None:
+async def cmd_search(message: Message, state: FSMContext) -> None:
     """Начать поиск кандидатов."""
+    await state.clear()  # команда прерывает незавершённую регистрацию
     viewer = await get_user(message.from_user.id)
     if viewer is None:
         await message.answer(texts.SEARCH_NO_PROFILE)

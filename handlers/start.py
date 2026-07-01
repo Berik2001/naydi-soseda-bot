@@ -206,11 +206,10 @@ async def profile_photo_set(message: Message, state: FSMContext) -> None:
         if data.get("new_media_type") == "video":
             await message.answer(texts.MEDIA_PHOTO_AFTER_VIDEO)
             return
-        if len(media) >= 2:
-            await message.answer(texts.PHOTO_MAX_TWO)
-            return
-        media.append(message.photo[-1].file_id)
-        await state.update_data(new_media=media, new_media_type="photo")
+        # Берём максимум 2 фото; лишние из альбома тихо игнорируем
+        if len(media) < 2:
+            media.append(message.photo[-1].file_id)
+            await state.update_data(new_media=media, new_media_type="photo")
     schedule_done_button(message, state, "media:done", "new_media")
 
 

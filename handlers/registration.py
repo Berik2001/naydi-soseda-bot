@@ -300,15 +300,13 @@ async def step_photo(message: Message, state: FSMContext) -> None:
     async with _photos_lock:
         data = await state.get_data()
         media = list(data.get("profile_media") or [])
-        mtype = data.get("profile_media_type")
-        if mtype == "video":
+        if data.get("profile_media_type") == "video":
             await message.answer(texts.MEDIA_PHOTO_AFTER_VIDEO)
             return
-        if len(media) >= 2:
-            await message.answer(texts.PHOTO_MAX_TWO)
-            return
-        media.append(message.photo[-1].file_id)
-        await state.update_data(profile_media=media, profile_media_type="photo")
+        # Берём максимум 2 фото; лишние из альбома тихо игнорируем (без спама)
+        if len(media) < 2:
+            media.append(message.photo[-1].file_id)
+            await state.update_data(profile_media=media, profile_media_type="photo")
     schedule_done_button(message, state, "media:done", "profile_media")
 
 

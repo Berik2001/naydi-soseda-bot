@@ -21,7 +21,11 @@ _photos_lock = asyncio.Lock()
 
 import texts
 from database.db import get_user, set_active, update_field
-from handlers.registration import refresh_done_button, start_registration
+from handlers.registration import (
+    cancel_done_button,
+    schedule_done_button,
+    start_registration,
+)
 from keyboards import inline
 from states.form import Edit
 from validators import is_valid_about, parse_budget
@@ -157,9 +161,7 @@ async def edit_apt_photo(message: Message, state: FSMContext) -> None:
             return  # больше 10 не добавляем (молча)
         photos.append(message.photo[-1].file_id)
         await state.update_data(apt_photos=photos)
-        await refresh_done_button(
-            message, state, "aptphoto:done", texts.photos_progress(len(photos))
-        )
+    schedule_done_button(message, state, "aptphoto:done", "apt_photos")
 
 
 @router.callback_query(Edit.waiting_apartment_photos, F.data == "aptphoto:done")
@@ -169,6 +171,7 @@ async def edit_apt_photos_done(call: CallbackQuery, state: FSMContext) -> None:
     if not photos:
         await call.answer(texts.APARTMENT_PHOTOS_NEED_ONE, show_alert=True)
         return
+    cancel_done_button(call.message.chat.id)
     try:
         await call.message.edit_reply_markup(reply_markup=None)
     except Exception:  # noqa: BLE001
@@ -208,9 +211,7 @@ async def profile_photo_set(message: Message, state: FSMContext) -> None:
             return
         media.append(message.photo[-1].file_id)
         await state.update_data(new_media=media, new_media_type="photo")
-        await refresh_done_button(
-            message, state, "media:done", texts.photos_progress(len(media))
-        )
+    schedule_done_button(message, state, "media:done", "new_media")
 
 
 @router.message(Edit.waiting_photo, F.video)
@@ -220,7 +221,7 @@ async def profile_video_set(message: Message, state: FSMContext) -> None:
         await message.answer(texts.MEDIA_VIDEO_AFTER_PHOTO)
         return
     await state.update_data(new_media=[message.video.file_id], new_media_type="video")
-    await refresh_done_button(message, state, "media:done", texts.VIDEO_PROGRESS)
+    schedule_done_button(message, state, "media:done", "__video__")
 
 
 @router.callback_query(Edit.waiting_photo, F.data == "media:done")
@@ -230,6 +231,7 @@ async def profile_media_done(call: CallbackQuery, state: FSMContext) -> None:
     if not media:
         await call.answer(texts.PHOTO_NEED_ONE, show_alert=True)
         return
+    cancel_done_button(call.message.chat.id)
     try:
         await call.message.edit_reply_markup(reply_markup=None)
     except Exception:  # noqa: BLE001

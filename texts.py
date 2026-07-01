@@ -218,7 +218,7 @@ def match_message(name: str | None, username: str | None, telegram_id: int) -> s
         contact = "👉 Нажми на имя выше, чтобы открыть профиль"
     return (
         "🎉 У вас мэтч!\n"
-        f"{link} хочет с тобой познакомиться\n"
+        f"{link} хочет с тобой пообщаться\n"
         f"{contact}"
     )
 

@@ -160,3 +160,30 @@ def test_user_card_dispatch_by_role():
         "district": None, "preferred_gender": "any", "budget": 120000, "about": None,
     }
     assert texts.user_card(provider).startswith("🏠 Есть жильё — ищу соседа")
+
+
+# ---------------------- match_message / user_link ----------------------
+
+def test_user_link_is_clickable_by_id():
+    link = texts.user_link("Аружан", 123456)
+    assert link == '<a href="tg://user?id=123456">Аружан</a>'
+
+
+def test_user_link_escapes_html():
+    # Спецсимволы в имени экранируются, чтобы не сломать HTML-разметку
+    link = texts.user_link("A<b>&", 1)
+    assert "<b>" not in link.replace('<a href="tg://user?id=1">', "")
+    assert "&lt;b&gt;&amp;" in link
+
+
+def test_match_message_name_is_link_without_username():
+    msg = texts.match_message("Аружан", None, 555)
+    assert '<a href="tg://user?id=555">Аружан</a>' in msg
+    assert "нет username" not in msg
+    assert "У вас мэтч" in msg
+
+
+def test_match_message_with_username():
+    msg = texts.match_message("Аружан", "aruzhan", 555)
+    assert "@aruzhan" in msg
+    assert '<a href="tg://user?id=555">Аружан</a>' in msg

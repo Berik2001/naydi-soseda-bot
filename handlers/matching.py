@@ -119,9 +119,13 @@ async def _notify_match(bot: Bot, user_a: int, user_b: int) -> None:
     if a is None or b is None:
         return
 
-    # Пишем каждому контакт другого
-    await bot.send_message(user_a, texts.match_message(b["full_name"], b["username"]))
-    await bot.send_message(user_b, texts.match_message(a["full_name"], a["username"]))
+    # Пишем каждому контакт другого (имя — кликабельная ссылка на профиль)
+    await bot.send_message(
+        user_a, texts.match_message(b["full_name"], b["username"], b["telegram_id"])
+    )
+    await bot.send_message(
+        user_b, texts.match_message(a["full_name"], a["username"], a["telegram_id"])
+    )
 
 
 async def _remove_buttons(call: CallbackQuery) -> None:

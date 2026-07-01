@@ -11,6 +11,8 @@
 
 from __future__ import annotations  # поддержка синтаксиса "X | None" на Python 3.9
 
+import html
+
 # ====================== ОБЩИЕ СООБЩЕНИЯ ======================
 
 WELCOME = (
@@ -197,12 +199,26 @@ LIKE_SENT = "❤️ Лайк отправлен!"
 SUPERLIKE_SENT = "⭐ Супер-лайк отправлен!"
 SKIPPED = "👎 Пропущено."
 
-def match_message(name: str, username: str | None) -> str:
-    """Сообщение о взаимном мэтче."""
-    contact = f"👉 @{username}" if username else "👉 (у пользователя нет username)"
+def user_link(name: str | None, telegram_id: int) -> str:
+    """
+    Кликабельное имя-ссылка на профиль пользователя.
+    Работает даже без username через tg://user?id=<id>.
+    Имя экранируется — в HTML-режиме спецсимволы не сломают разметку.
+    """
+    safe = html.escape(name or "Пользователь")
+    return f'<a href="tg://user?id={telegram_id}">{safe}</a>'
+
+
+def match_message(name: str | None, username: str | None, telegram_id: int) -> str:
+    """Сообщение о взаимном мэтче. Имя — кликабельная ссылка на профиль."""
+    link = user_link(name, telegram_id)
+    if username:
+        contact = f"👉 @{username}"
+    else:
+        contact = "👉 Нажми на имя выше, чтобы открыть профиль"
     return (
         "🎉 У вас мэтч!\n"
-        f"{name} хочет с тобой познакомиться\n"
+        f"{link} хочет с тобой познакомиться\n"
         f"{contact}"
     )
 

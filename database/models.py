@@ -59,26 +59,33 @@ CREATE TABLE IF NOT EXISTS likes (
 
 ALL_TABLES = [CREATE_USERS, CREATE_VIEWS, CREATE_LIKES]
 
-# Идемпотентные миграции — применяются при каждом старте (ADD COLUMN IF NOT EXISTS).
-# Позволяют доезжать изменениям схемы на уже существующую БД без ручного ALTER.
+# Версионные миграции: список (version, SQL). Каждая применяется РОВНО один раз —
+# факт применения фиксируется в таблице schema_migrations (см. db.init_db).
+# Раньше весь список гонялся при каждом старте, включая полнотабличные UPDATE-
+# бэкфиллы (7–9) — с ростом таблицы это дорожало и гонялось наперегонки при
+# старте нескольких инстансов. Сами запросы остаются идемпотентными, поэтому
+# первый запуск после этого изменения безопасно до-применит их и запомнит версии.
+#
+# ВАЖНО: номера версий неизменны и только растут — новые миграции добавляй в конец
+# с новым номером, существующие не переиспользуй и не меняй.
 MIGRATIONS = [
-    "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE",
-    "ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_until TIMESTAMP",
-    "ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT",
-    "ALTER TABLE users ADD COLUMN IF NOT EXISTS apartment_photos TEXT[]",
-    "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_media TEXT[]",
-    "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_media_type TEXT",
+    (1, "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE"),
+    (2, "ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_until TIMESTAMP"),
+    (3, "ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT"),
+    (4, "ALTER TABLE users ADD COLUMN IF NOT EXISTS apartment_photos TEXT[]"),
+    (5, "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_media TEXT[]"),
+    (6, "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_media_type TEXT"),
     # Бэкфилл роли для уже существующих анкет (по тексту цели)
-    "UPDATE users SET role = 'seeker' WHERE role IS NULL AND goal LIKE '%Ищу комнату%'",
-    "UPDATE users SET role = 'provider' WHERE role IS NULL AND goal IS NOT NULL",
+    (7, "UPDATE users SET role = 'seeker' WHERE role IS NULL AND goal LIKE '%Ищу комнату%'"),
+    (8, "UPDATE users SET role = 'provider' WHERE role IS NULL AND goal IS NOT NULL"),
     # Пол сожителя теперь всегда равен собственному полу (парни с парнями,
     # девушки с девушками). Приводим старые анкеты, где стояло 'any' или иное.
-    "UPDATE users SET preferred_gender = gender "
-    "WHERE gender IS NOT NULL AND preferred_gender IS DISTINCT FROM gender",
+    (9, "UPDATE users SET preferred_gender = gender "
+        "WHERE gender IS NOT NULL AND preferred_gender IS DISTINCT FROM gender"),
     # Индексы под горячие запросы. get_next_candidate фильтрует users по
     # city+is_active; has_like/who_liked_me ищут likes по to_id (UNIQUE на
     # (from_id,to_id) такой поиск не покрывает); лента исключает по views.viewer_id.
-    "CREATE INDEX IF NOT EXISTS idx_users_city_active ON users (city, is_active)",
-    "CREATE INDEX IF NOT EXISTS idx_likes_to_id ON likes (to_id)",
-    "CREATE INDEX IF NOT EXISTS idx_views_viewer ON views (viewer_id)",
+    (10, "CREATE INDEX IF NOT EXISTS idx_users_city_active ON users (city, is_active)"),
+    (11, "CREATE INDEX IF NOT EXISTS idx_likes_to_id ON likes (to_id)"),
+    (12, "CREATE INDEX IF NOT EXISTS idx_views_viewer ON views (viewer_id)"),
 ]

@@ -15,6 +15,10 @@ from database.models import ALL_TABLES, MIGRATIONS
 # Глобальный пул соединений
 _pool: asyncpg.Pool | None = None
 
+# Ключ advisory-лока миграций: гарантирует, что при одновременном старте
+# нескольких инстансов схему мигрирует только один (остальные ждут).
+_MIGRATION_LOCK_ID = 776_211
+
 
 async def create_pool(dsn: str) -> asyncpg.Pool:
     """Создать пул соединений и подготовить таблицы."""
@@ -38,14 +42,36 @@ def get_pool() -> asyncpg.Pool:
 
 
 async def init_db() -> None:
-    """Создать все таблицы, если их ещё нет, и применить миграции."""
+    """
+    Создать все таблицы (IF NOT EXISTS — дёшево) и применить НЕприменённые
+    миграции ровно по одному разу, отмечая версию в schema_migrations.
+    """
     pool = get_pool()
     async with pool.acquire() as conn:
         for query in ALL_TABLES:
             await conn.execute(query)
-        # Идемпотентные миграции схемы (ADD COLUMN IF NOT EXISTS и т.п.)
-        for query in MIGRATIONS:
-            await conn.execute(query)
+
+        await conn.execute(
+            "CREATE TABLE IF NOT EXISTS schema_migrations ("
+            "version INTEGER PRIMARY KEY, applied_at TIMESTAMP DEFAULT NOW())"
+        )
+
+        # Только один инстанс мигрирует одновременно (остальные ждут лок).
+        await conn.execute("SELECT pg_advisory_lock($1)", _MIGRATION_LOCK_ID)
+        try:
+            rows = await conn.fetch("SELECT version FROM schema_migrations")
+            applied = {r["version"] for r in rows}
+            for version, query in MIGRATIONS:
+                if version in applied:
+                    continue
+                await conn.execute(query)
+                await conn.execute(
+                    "INSERT INTO schema_migrations (version) VALUES ($1) "
+                    "ON CONFLICT DO NOTHING",
+                    version,
+                )
+        finally:
+            await conn.execute("SELECT pg_advisory_unlock($1)", _MIGRATION_LOCK_ID)
 
 
 # ====================== РАБОТА С АНКЕТАМИ ======================

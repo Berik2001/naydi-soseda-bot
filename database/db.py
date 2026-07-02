@@ -10,6 +10,7 @@ from __future__ import annotations  # поддержка синтаксиса "X
 
 import asyncpg
 
+from config import DB_POOL_MAX_SIZE, DB_POOL_MIN_SIZE
 from database.models import ALL_TABLES, MIGRATIONS
 
 # Глобальный пул соединений
@@ -21,9 +22,15 @@ _MIGRATION_LOCK_ID = 776_211
 
 
 async def create_pool(dsn: str) -> asyncpg.Pool:
-    """Создать пул соединений и подготовить таблицы."""
+    """Создать пул соединений и подготовить таблицы.
+
+    Размер пула ограничен (см. config.DB_POOL_*), чтобы при выкатке два
+    контейнера укладывались в лимит клиентов пулера Supabase.
+    """
     global _pool
-    _pool = await asyncpg.create_pool(dsn=dsn)
+    _pool = await asyncpg.create_pool(
+        dsn=dsn, min_size=DB_POOL_MIN_SIZE, max_size=DB_POOL_MAX_SIZE
+    )
     await init_db()
     return _pool
 

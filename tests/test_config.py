@@ -25,3 +25,31 @@ def test_int_env_fallback_and_parse(monkeypatch):
     assert config._int_env("DB_POOL_MAX_SIZE", 5) == 5
     monkeypatch.setenv("DB_POOL_MAX_SIZE", "20")
     assert config._int_env("DB_POOL_MAX_SIZE", 5) == 20
+
+
+# ---------------------- наблюдаемость ----------------------
+
+def test_sentry_dsn_default_none(monkeypatch):
+    monkeypatch.delenv("SENTRY_DSN", raising=False)
+    assert config.get_sentry_dsn() is None
+
+
+def test_sentry_dsn_present(monkeypatch):
+    monkeypatch.setenv("SENTRY_DSN", "https://k@o.ingest.sentry.io/1")
+    assert config.get_sentry_dsn() == "https://k@o.ingest.sentry.io/1"
+
+
+def test_log_level_default_info(monkeypatch):
+    monkeypatch.delenv("LOG_LEVEL", raising=False)
+    assert config.get_log_level() == "INFO"
+
+
+def test_log_level_uppercased(monkeypatch):
+    monkeypatch.setenv("LOG_LEVEL", "debug")
+    assert config.get_log_level() == "DEBUG"
+
+
+def test_environment_default_production(monkeypatch):
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    monkeypatch.delenv("RAILWAY_ENVIRONMENT", raising=False)
+    assert config.get_environment() == "production"

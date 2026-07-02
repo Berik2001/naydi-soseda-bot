@@ -1,0 +1,22 @@
+# Секреты — НИКОГДА в образ
+.env
+
+# Окружения и кеши
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# VCS / IDE / ОС
+.git/
+.github/
+.idea/
+.vscode/
+.DS_Store
+
+# Не нужно в рантайме
+tests/
+*.md

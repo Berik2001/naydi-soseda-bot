@@ -90,3 +90,20 @@ def get_redis_url() -> str | None:
     возможность горизонтального масштаба. Если нет — используется MemoryStorage.
     """
     return os.getenv("REDIS_URL") or None
+
+
+# ====================== НАБЛЮДАЕМОСТЬ ======================
+
+def get_sentry_dsn() -> str | None:
+    """DSN Sentry для трекинга ошибок (опционально). Нет — Sentry выключен."""
+    return os.getenv("SENTRY_DSN") or None
+
+
+def get_log_level() -> str:
+    """Уровень логирования (INFO по умолчанию). Напр. DEBUG/WARNING/ERROR."""
+    return (os.getenv("LOG_LEVEL") or "INFO").upper()
+
+
+def get_environment() -> str:
+    """Окружение для тегирования событий Sentry (production по умолчанию)."""
+    return os.getenv("ENVIRONMENT") or os.getenv("RAILWAY_ENVIRONMENT") or "production"

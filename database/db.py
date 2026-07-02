@@ -180,48 +180,54 @@ async def set_active(telegram_id: int, active: bool) -> None:
 
 # ====================== МЭТЧИНГ ======================
 
-async def get_next_candidate(viewer: asyncpg.Record) -> asyncpg.Record | None:
+async def get_next_candidate(viewer_id: int) -> asyncpg.Record | None:
     """
-    Найти следующего подходящего кандидата для viewer.
+    Найти следующего подходящего кандидата для смотрящего (по его telegram_id).
+
+    Данные смотрящего (город, preferred_gender, роль) берутся тем же запросом
+    через CTE `me` — не нужен отдельный get_user перед каждым свайпом.
 
     Фильтры (без бюджета):
       1. Тот же город
       2. Пол кандидата совпадает с preferred_gender смотрящего
          (парни видят парней, девушки — девушек)
-      3. Противоположная роль (ищущий видит объявления, сдающий — анкеты)
+      3. Противоположная роль (ищущий видит объявления, сдающий — анкеты;
+         если роль смотрящего неизвестна — показываем всех)
       4. Не сам пользователь и не показанные ранее
       5. Кандидат активен
+
+    Возвращает None, если смотрящего нет или подходящих кандидатов не осталось.
     """
     pool = get_pool()
-    pref = viewer["preferred_gender"]
-    # Показываем противоположную роль: ищущим — объявления (provider),
-    # сдающим — анкеты (seeker). Если роль неизвестна — показываем всех.
-    opposite = None
-    if viewer["role"] == "seeker":
-        opposite = "provider"
-    elif viewer["role"] == "provider":
-        opposite = "seeker"
-
     async with pool.acquire() as conn:
         return await conn.fetchrow(
             """
-            SELECT * FROM users u
-            WHERE u.telegram_id != $1
+            WITH me AS (
+                SELECT telegram_id, city, preferred_gender,
+                       CASE role
+                            WHEN 'seeker'   THEN 'provider'
+                            WHEN 'provider' THEN 'seeker'
+                            ELSE NULL
+                       END AS opposite
+                FROM users WHERE telegram_id = $1
+            )
+            SELECT u.* FROM users u CROSS JOIN me
+            WHERE u.telegram_id <> me.telegram_id
               AND u.is_active = TRUE
-              AND u.city = $2
-              AND ($3 = 'any' OR u.gender = $3)
+              AND u.city = me.city
+              AND (me.preferred_gender = 'any' OR u.gender = me.preferred_gender)
               -- противоположная роль (если у смотрящего роль задана)
-              AND ($4::text IS NULL OR u.role = $4)
+              AND (me.opposite IS NULL OR u.role = me.opposite)
               AND NOT EXISTS (
                     SELECT 1 FROM views v
-                    WHERE v.viewer_id = $1 AND v.viewed_id = u.telegram_id
+                    WHERE v.viewer_id = me.telegram_id AND v.viewed_id = u.telegram_id
               )
             -- Премиум-анкеты показываем первыми
             ORDER BY (u.premium_until IS NOT NULL AND u.premium_until > now()) DESC,
                      u.created_at DESC
             LIMIT 1
             """,
-            viewer["telegram_id"], viewer["city"], pref, opposite,
+            viewer_id,
         )
 
 

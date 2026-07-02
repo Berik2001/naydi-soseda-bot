@@ -3,6 +3,8 @@
 Поиск сожителей (/search) и логика лайков / взаимных мэтчей.
 """
 
+import asyncio
+
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -44,7 +46,7 @@ async def start_search(message: Message, viewer) -> None:
 
     Используется командой /search и быстрым путём регистрации «есть жильё».
     """
-    candidate = await get_next_candidate(viewer)
+    candidate = await get_next_candidate(viewer["telegram_id"])
     if candidate is None:
         await message.answer(texts.SEARCH_EMPTY)
         return
@@ -59,8 +61,7 @@ async def _send_candidate(message: Message, candidate) -> None:
 
 async def _show_next(message: Message, viewer_id: int) -> None:
     """Показать следующего кандидата (или сообщить, что анкеты закончились)."""
-    viewer = await get_user(viewer_id)
-    candidate = await get_next_candidate(viewer)
+    candidate = await get_next_candidate(viewer_id)
     if candidate is None:
         await message.answer(texts.SEARCH_END)
         return
@@ -94,14 +95,18 @@ async def _process_like(call: CallbackQuery, bot: Bot, is_super: bool) -> None:
     viewer_id = call.from_user.id
     candidate_id = int(call.data.split(":", 1)[1])
 
-    await add_view(viewer_id, candidate_id)
-    await add_like(viewer_id, candidate_id, is_super=is_super)
+    # Три независимые операции БД выполняем разом (одним round-trip вместо трёх):
+    # отметить просмотр, поставить лайк и проверить встречный лайк кандидата.
+    _, _, reciprocal = await asyncio.gather(
+        add_view(viewer_id, candidate_id),
+        add_like(viewer_id, candidate_id, is_super=is_super),
+        has_like(candidate_id, viewer_id),
+    )
 
     await _remove_buttons(call)
     await call.answer(texts.SUPERLIKE_SENT if is_super else texts.LIKE_SENT)
 
-    # Проверяем взаимность: лайкнул ли кандидат смотрящего ранее
-    if await has_like(candidate_id, viewer_id):
+    if reciprocal:
         # Оба лайкнули друг друга → мэтч, шлём контакт обоим
         await _notify_match(bot, viewer_id, candidate_id)
     else:

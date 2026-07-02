@@ -25,13 +25,22 @@ from keyboards import inline
 # Сериализуют чтение-запись списка фото при конкурентной загрузке альбома
 # (aiogram обрабатывает апдейты параллельно, handle_as_tasks=True). Лок свой на
 # каждый чат — раньше был один глобальный на всех, и фото разных пользователей
-# стояли в очереди друг за другом. Словарь растёт по числу чатов (лок крошечный).
+# стояли в очереди друг за другом.
+#
+# Лок нужен только на короткое время загрузки альбома. Чтобы словарь не рос
+# бесконечно (по entry на каждого, кто когда-либо грузил фото), записи чистятся:
+# на завершении шага (см. cancel_done_button) и опортунистически при переполнении
+# (свободные локи можно смело выбрасывать — при новой загрузке создастся заново).
 _locks: dict = {}
+_LOCK_CAP = 5000
 
 
 def _lock_for(chat_id: int) -> asyncio.Lock:
     lock = _locks.get(chat_id)
     if lock is None:
+        if len(_locks) >= _LOCK_CAP:
+            for key in [k for k, v in _locks.items() if not v.locked()]:
+                del _locks[key]
         lock = asyncio.Lock()
         _locks[chat_id] = lock
     return lock
@@ -42,6 +51,15 @@ def _lock_for(chat_id: int) -> asyncio.Lock:
 # с паузой после последнего фото (иначе счётчик мигает: фото 1, фото 2, ...).
 # Ключ — chat_id.
 _done_tasks: dict = {}
+_DONE_TASKS_CAP = 5000
+
+
+def _prune_done_tasks() -> None:
+    """Выбросить завершённые задачи, чтобы словарь не рос (брошенные загрузки)."""
+    if len(_done_tasks) < _DONE_TASKS_CAP:
+        return
+    for key in [k for k, t in _done_tasks.items() if t.done()]:
+        _done_tasks.pop(key, None)
 
 
 async def _post_done_button(message: Message, state: FSMContext, action: str, key: str) -> None:
@@ -75,6 +93,7 @@ async def _delayed_done(message: Message, state: FSMContext, action: str, key: s
 def schedule_done_button(message: Message, state: FSMContext, action: str, key: str) -> None:
     """Показать кнопку «Готово ✅» один раз — через паузу после последнего фото."""
     chat_id = message.chat.id
+    _prune_done_tasks()
     task = _done_tasks.get(chat_id)
     if task and not task.done():
         task.cancel()
@@ -82,10 +101,14 @@ def schedule_done_button(message: Message, state: FSMContext, action: str, key: 
 
 
 def cancel_done_button(chat_id: int) -> None:
-    """Отменить отложенный показ кнопки (при завершении шага)."""
+    """
+    Завершить шаг загрузки: отменить отложенную кнопку и освободить память —
+    убрать запись задачи и per-chat лок (загрузка окончена, они больше не нужны).
+    """
     task = _done_tasks.pop(chat_id, None)
     if task and not task.done():
         task.cancel()
+    _locks.pop(chat_id, None)
 
 
 # ====================== СБОР МЕДИА ======================

@@ -104,3 +104,31 @@ def test_collect_profile_video_rejected_after_photo():
         done_action="x"))
     assert st._d["profile_media"] == ["p"]   # видео не примешалось к фото
     assert msg.answers
+
+
+# ---------------------- очистка памяти ----------------------
+
+def test_cancel_done_button_frees_lock_and_task():
+    async def body():
+        media_flow._locks[999] = asyncio.Lock()
+        media_flow._done_tasks.pop(999, None)  # брошенной задачи нет
+        media_flow.cancel_done_button(999)
+    _run(body())
+    assert 999 not in media_flow._locks        # лок освобождён
+    assert 999 not in media_flow._done_tasks
+
+
+def test_lock_for_prunes_free_locks_over_cap(monkeypatch):
+    monkeypatch.setattr(media_flow, "_LOCK_CAP", 3)
+
+    async def body():
+        media_flow._locks.clear()
+        for i in range(3):                     # три свободных лока
+            media_flow._locks[i] = asyncio.Lock()
+        return media_flow._lock_for(100)       # переполнение → prune свободных
+
+    lock = _run(body())
+    assert 100 in media_flow._locks
+    assert not lock.locked()
+    assert len(media_flow._locks) == 1         # остался только новый
+    media_flow._locks.clear()

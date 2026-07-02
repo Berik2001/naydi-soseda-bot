@@ -194,13 +194,17 @@ def test_match_message_with_username():
 
 def test_incoming_like_header_like():
     header = texts.incoming_like_header(is_super=False)
-    assert "лайк" in header.lower() or "понрав" in header.lower()
-    assert "СУПЕР" not in header
+    # Нейтральная «жилищная» формулировка, без дейтинг-лексики
+    assert "сосед" in header.lower()
+    assert "понрав" not in header.lower()
+    assert "⭐" not in header
 
 
 def test_incoming_like_header_superlike():
     header = texts.incoming_like_header(is_super=True)
-    assert "СУПЕР" in header
+    assert "⭐" in header
+    assert "сосед" in header.lower()
+    assert "понрав" not in header.lower()
 
 
 # ---------------------- HTML-экранирование карточек ----------------------

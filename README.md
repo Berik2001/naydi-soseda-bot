@@ -94,7 +94,8 @@ pytest                      # запустить все тесты
 ruff check .                # линт
 ```
 
-- **CI** ([.github/workflows/ci.yml](.github/workflows/ci.yml)): на каждый push/PR — линт, проверка компиляции и `pytest`.
+- **CI** ([.github/workflows/ci.yml](.github/workflows/ci.yml)): на каждый push/PR — линт, проверка компиляции и `pytest` (с эфемерным PostgreSQL для интеграционных тестов слоя БД).
+- **Интеграционные тесты БД** ([tests/test_integration_db.py](tests/test_integration_db.py)) проверяют ядро — правила подбора кандидата и взаимные лайки — против реального Postgres. Локально: `TEST_DATABASE_URL=postgresql://postgres@localhost:5432/postgres pytest -q` (без переменной они пропускаются).
 - **CD**: Railway деплоит из ветки `main` и ждёт зелёного CI — сломанный код в прод не уедет.
 - Чистая бизнес-логика вынесена в тестируемые модули: [validators.py](validators.py) (парсинг/валидация), [texts.py](texts.py) (сборка карточек + экранирование), [media_flow.py](media_flow.py) (сбор медиа).
 

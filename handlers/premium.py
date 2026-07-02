@@ -19,6 +19,7 @@ from aiogram.types import (
 )
 
 import texts
+from config import PREMIUM_DAYS, PREMIUM_PAYLOAD, PREMIUM_STARS
 from database.db import (
     activate_premium,
     get_premium_until,
@@ -28,11 +29,6 @@ from database.db import (
 from keyboards import inline
 
 router = Router()
-
-# --- Настройки премиума (легко менять) ---
-PREMIUM_STARS = 150     # цена в Telegram Stars
-PREMIUM_DAYS = 30       # срок действия в днях
-PREMIUM_PAYLOAD = "premium_30d"  # идентификатор товара в payload инвойса
 
 
 # ====================== ЭКРАН ПРЕМИУМА ======================

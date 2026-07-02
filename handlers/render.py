@@ -13,11 +13,6 @@
 
 from aiogram.types import InputMediaPhoto, Message
 
-# Короткая подпись для отдельного сообщения с кнопками (под альбомом, у
-# которого собственных inline-кнопок быть не может). Telegram не позволяет
-# отправить кнопки без текста, поэтому строка максимально нейтральная.
-ACTIONS_LABEL = "Выбери вариант:"
-
 
 def _get(obj, key):
     """Достать поле и из dict (FSM data), и из asyncpg.Record; None если нет."""
@@ -35,8 +30,10 @@ async def _render(user, card_text, reply_markup, *,
     и через bot.send_* (уведомление другому пользователю).
 
     Правила отображения:
-    - 2–10 фото → media group (альбом): компактная сетка. Кнопки/текст идут
-      отдельным сообщением, т.к. у альбома не может быть inline-клавиатуры.
+    - 2–10 фото → media group (альбом): компактная сетка фото без подписи, а
+      следом одно сообщение с текстом карточки и кнопками (у альбома не может
+      быть inline-клавиатуры, поэтому текст+кнопки идут отдельным сообщением —
+      без служебных подписей вроде «Выбери вариант»).
     - ровно 1 фото → обычное фото с подписью (одиночное фото Telegram всегда
       показывает крупно — это его поведение, через Bot API не уменьшить).
     - видео → видео с подписью.
@@ -56,23 +53,34 @@ async def _render(user, card_text, reply_markup, *,
         media = [_get(user, "photo_file_id")]
         mtype = "photo"
 
+    # Медиа отправляем «мягко»: если file_id протух (Telegram удалил файл или
+    # сменился токен бота), отправка падает — тогда просто пропускаем картинку,
+    # но текст карточки с кнопками пользователь получает в любом случае.
     if mtype == "video" and media:
-        await send_video(media[0], card_text, reply_markup)
+        try:
+            await send_video(media[0], card_text, reply_markup)
+        except Exception:
+            await send_text(card_text, reply_markup)
     elif mtype == "photo" and len(media) >= 2:
-        # Альбом: текст карточки — подписью к первому фото (текст и фото вместе,
-        # фото компактной сеткой). Кнопки у media group невозможны, поэтому
-        # меню/действия отправляем отдельным коротким сообщением.
-        album = []
-        for i, f in enumerate(media[:10]):
-            if i == 0:
-                album.append(InputMediaPhoto(media=f, caption=card_text))
-            else:
-                album.append(InputMediaPhoto(media=f))
-        await send_album(album)
-        if reply_markup is not None:
-            await send_text(ACTIONS_LABEL, reply_markup)
+        # Альбом: сначала компактная сетка фото (без подписи), затем текст
+        # карточки вместе с кнопками — так не нужно служебное сообщение-подпись.
+        album = [InputMediaPhoto(media=f) for f in media[:10]]
+        try:
+            await send_album(album)
+        except Exception:
+            # Один битый file_id рушит весь альбом — шлём фото по одному,
+            # пропуская сбойные, чтобы показать хотя бы уцелевшие.
+            for f in media[:10]:
+                try:
+                    await send_photo(f, None, None)
+                except Exception:
+                    continue
+        await send_text(card_text, reply_markup)
     elif mtype == "photo" and len(media) == 1:
-        await send_photo(media[0], card_text, reply_markup)
+        try:
+            await send_photo(media[0], card_text, reply_markup)
+        except Exception:
+            await send_text(card_text, reply_markup)
     else:
         await send_text(card_text, reply_markup)
 

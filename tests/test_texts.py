@@ -200,6 +200,13 @@ def test_incoming_like_header_like():
     assert "⭐" not in header
 
 
+def test_photo_skip_hint_is_encouraging():
+    # Подсказка при пропуске фото: мягкая, про «быстрее» и «фото»
+    hint = texts.PHOTO_SKIP_HINT
+    assert "фото" in hint.lower()
+    assert "быстрее" in hint.lower()
+
+
 def test_incoming_like_header_superlike():
     header = texts.incoming_like_header(is_super=True)
     assert "⭐" in header

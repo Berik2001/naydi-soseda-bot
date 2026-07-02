@@ -171,16 +171,18 @@ async def step_budget(message: Message, state: FSMContext) -> None:
     await state.update_data(budget=amount)
     data = await state.get_data()
     if _is_provider(data):
-        # Сдаю/есть жильё -> загрузка фото квартиры
+        # Сдаю/есть жильё -> загрузка фото квартиры (необязательно, можно пропустить)
         await state.update_data(apartment_photos=[], done_msg_id=None)
         await state.set_state(Form.apartment_photos)
-        await message.answer(texts.ASK_APARTMENT_PHOTOS)
+        await message.answer(
+            texts.ASK_APARTMENT_PHOTOS, reply_markup=inline.photo_skip_kb("aptphoto:skip")
+        )
     else:
         # Ищущий -> сразу к фото профиля (шаги «когда заехать» и «занятость»
-        # убраны: это пользователь пишет свободно в «о себе»).
+        # убраны: это пользователь пишет свободно в «о себе»). Фото необязательно.
         await state.update_data(profile_media=[], profile_media_type=None, done_msg_id=None)
         await state.set_state(Form.photo)
-        await message.answer(texts.ASK_PHOTO)
+        await message.answer(texts.ASK_PHOTO, reply_markup=inline.photo_skip_kb("photo:skip"))
 
 
 # ====================== ОБЪЯВЛЕНИЕ: ФОТО КВАРТИРЫ (сдаю) ======================
@@ -192,6 +194,13 @@ async def step_apartment_photo(message: Message, state: FSMContext) -> None:
         list_key="apartment_photos", done_action="aptphoto:done",
         max_count=MAX_APARTMENT_PHOTOS,
     )
+
+
+async def _go_to_listing_about(message: Message, state: FSMContext) -> None:
+    """Перейти к описанию объявления (после фото квартиры — Готово или Пропустить)."""
+    data = await state.get_data()
+    await state.set_state(Form.listing_about)
+    await message.answer(texts.ask_listing_desc(data.get("gender")))
 
 
 @router.callback_query(Form.apartment_photos, F.data == "aptphoto:done")
@@ -206,9 +215,23 @@ async def step_apartment_photos_done(call: CallbackQuery, state: FSMContext) -> 
         await call.message.edit_reply_markup(reply_markup=None)
     except Exception:  # noqa: BLE001
         pass
-    await state.set_state(Form.listing_about)
-    await call.message.answer(texts.ask_listing_desc(data.get("gender")))
     await call.answer()
+    await _go_to_listing_about(call.message, state)
+
+
+@router.callback_query(Form.apartment_photos, F.data == "aptphoto:skip")
+async def step_apartment_photos_skip(call: CallbackQuery, state: FSMContext) -> None:
+    """Пропустить фото квартиры — фото необязательны."""
+    cancel_done_button(call.message.chat.id)
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:  # noqa: BLE001
+        pass
+    await call.answer()
+    data = await state.get_data()
+    if not (data.get("apartment_photos") or []):
+        await call.message.answer(texts.PHOTO_SKIP_HINT)
+    await _go_to_listing_about(call.message, state)
 
 
 @router.message(Form.apartment_photos)
@@ -256,6 +279,12 @@ async def step_video(message: Message, state: FSMContext) -> None:
     )
 
 
+async def _go_to_about(message: Message, state: FSMContext) -> None:
+    """Перейти к «о себе» (после фото профиля — Готово или Пропустить)."""
+    await state.set_state(Form.about)
+    await message.answer(texts.ASK_ABOUT)
+
+
 @router.callback_query(Form.photo, F.data == "media:done")
 async def step_photo_done(call: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
@@ -267,14 +296,28 @@ async def step_photo_done(call: CallbackQuery, state: FSMContext) -> None:
         await call.message.edit_reply_markup(reply_markup=None)
     except Exception:  # noqa: BLE001
         pass
-    await state.set_state(Form.about)
-    await call.message.answer(texts.ASK_ABOUT)
     await call.answer()
+    await _go_to_about(call.message, state)
+
+
+@router.callback_query(Form.photo, F.data == "photo:skip")
+async def step_photo_skip(call: CallbackQuery, state: FSMContext) -> None:
+    """Пропустить фото профиля — фото необязательны."""
+    cancel_done_button(call.message.chat.id)
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:  # noqa: BLE001
+        pass
+    await call.answer()
+    data = await state.get_data()
+    if not (data.get("profile_media") or []):
+        await call.message.answer(texts.PHOTO_SKIP_HINT)
+    await _go_to_about(call.message, state)
 
 
 @router.message(Form.photo)
 async def step_photo_wrong(message: Message) -> None:
-    await message.answer(texts.PHOTO_NEED_ONE)
+    await message.answer(texts.SEND_PHOTO_OR_SKIP)
 
 
 # ====================== ШАГ 12 — О СЕБЕ (обязательно) ======================

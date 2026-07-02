@@ -12,7 +12,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import BotCommand
+from aiogram.types import BotCommand, ErrorEvent
 
 import config
 from database.db import close_pool, create_pool
@@ -23,6 +23,18 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+async def on_error(event: ErrorEvent) -> bool:
+    """
+    Глобальный перехват необработанных исключений в хендлерах.
+
+    Без него падение любого хендлера тонет в общем логе aiogram, а пользователь
+    видит «зависание». Логируем с трейсбеком (для наблюдаемости) и гасим ошибку,
+    чтобы один битый апдейт не ронял обработку остальных.
+    """
+    logger.exception("Ошибка при обработке апдейта: %s", event.exception)
+    return True
 
 
 async def set_commands(bot: Bot) -> None:
@@ -60,6 +72,9 @@ async def main() -> None:
     dp.include_router(matching.router)
     dp.include_router(premium.router)
     dp.include_router(registration.router)
+
+    # Глобальный перехват ошибок хендлеров (логирование + не роняем polling)
+    dp.errors.register(on_error)
 
     await set_commands(bot)
 

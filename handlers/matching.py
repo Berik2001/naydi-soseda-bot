@@ -54,12 +54,7 @@ async def start_search(message: Message, viewer) -> None:
 async def _send_candidate(message: Message, candidate) -> None:
     """Показать карточку кандидата с кнопками действий (через общий рендер)."""
     kb = inline.match_kb(candidate["telegram_id"])
-    card = (
-        texts.listing_card(candidate)
-        if candidate["role"] == "provider"
-        else texts.profile_card(candidate)
-    )
-    await send_media_card(message, candidate, card, reply_markup=kb)
+    await send_media_card(message, candidate, texts.user_card(candidate), reply_markup=kb)
 
 
 async def _show_next(message: Message, viewer_id: int) -> None:

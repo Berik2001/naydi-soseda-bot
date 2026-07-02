@@ -47,9 +47,18 @@ def build_storage() -> BaseStorage:
     """
     redis_url = config.get_redis_url()
     if redis_url:
-        from aiogram.fsm.storage.redis import RedisStorage
-        logger.info("FSM-хранилище: Redis.")
-        return RedisStorage.from_url(redis_url)
+        try:
+            from aiogram.fsm.storage.redis import RedisStorage
+            storage = RedisStorage.from_url(redis_url)
+            logger.info("FSM-хранилище: Redis.")
+            return storage
+        except Exception as exc:  # noqa: BLE001 — не роняем бота из-за кривого URL
+            logger.error(
+                "Не удалось инициализировать Redis (%s). Откат на MemoryStorage. "
+                "Проверь REDIS_URL — нужна строка вида "
+                "rediss://default:ПАРОЛЬ@host:6379 (не REST-URL https://...).",
+                exc,
+            )
     logger.info(
         "FSM-хранилище: в памяти. Для устойчивости к рестартам и масштаба "
         "задай REDIS_URL."

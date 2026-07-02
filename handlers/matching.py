@@ -12,6 +12,7 @@ from aiogram.types import CallbackQuery, Message
 
 from handlers.render import send_media_card, send_media_card_to_chat
 
+import cards
 import texts
 from database.matching import add_like, add_view, get_next_candidate, has_like
 from database.users import get_user
@@ -51,7 +52,7 @@ async def start_search(message: Message, viewer) -> None:
 async def _send_candidate(message: Message, candidate) -> None:
     """Показать карточку кандидата с кнопками действий (через общий рендер)."""
     kb = inline.match_kb(candidate["telegram_id"])
-    await send_media_card(message, candidate, texts.user_card(candidate), reply_markup=kb)
+    await send_media_card(message, candidate, cards.user_card(candidate), reply_markup=kb)
 
 
 async def _show_next(message: Message, viewer_id: int) -> None:
@@ -118,7 +119,7 @@ async def _notify_incoming_like(bot: Bot, liker_id: int, target_id: int,
     if liker is None:
         return
     header = texts.incoming_like_header(is_super)
-    caption = f"{header}\n\n{texts.user_card(liker)}"
+    caption = f"{header}\n\n{cards.user_card(liker)}"
     try:
         await send_media_card_to_chat(
             bot, target_id, liker, caption,
@@ -164,10 +165,10 @@ async def _notify_match(bot: Bot, user_a: int, user_b: int) -> None:
     # получает уведомление (return_exceptions гасит ошибку отправки).
     await asyncio.gather(
         bot.send_message(
-            user_a, texts.match_message(b["full_name"], b["username"], b["telegram_id"])
+            user_a, cards.match_message(b["full_name"], b["username"], b["telegram_id"])
         ),
         bot.send_message(
-            user_b, texts.match_message(a["full_name"], a["username"], a["telegram_id"])
+            user_b, cards.match_message(a["full_name"], a["username"], a["telegram_id"])
         ),
         return_exceptions=True,
     )

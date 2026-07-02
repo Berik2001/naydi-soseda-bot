@@ -10,6 +10,7 @@ from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
+import cards
 import texts
 from config import MAX_APARTMENT_PHOTOS, MAX_PROFILE_PHOTOS
 from database.users import upsert_user
@@ -314,7 +315,7 @@ async def _show_card_preview(message: Message, state: FSMContext) -> None:
     await state.clear()
 
     await send_media_card(
-        message, data, texts.user_card(data),
+        message, data, cards.user_card(data),
         reply_markup=inline.profile_menu_kb(data.get("role")),
     )
 

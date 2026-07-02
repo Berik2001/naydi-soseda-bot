@@ -1,21 +1,22 @@
 # -*- coding: utf-8 -*-
 """Тесты форматирования и сборки карточки анкеты (texts.py)."""
 
+import cards
 import texts
 
 
 # ---------------------- format_budget ----------------------
 
 def test_format_budget_groups_thousands():
-    assert texts.format_budget(100000) == "100 000 тг"
+    assert cards.format_budget(100000) == "100 000 тг"
 
 
 def test_format_budget_million():
-    assert texts.format_budget(1500000) == "1 500 000 тг"
+    assert cards.format_budget(1500000) == "1 500 000 тг"
 
 
 def test_format_budget_small():
-    assert texts.format_budget(10000) == "10 000 тг"
+    assert cards.format_budget(10000) == "10 000 тг"
 
 
 # ---------------------- profile_card ----------------------
@@ -40,7 +41,7 @@ def _sample_user(**overrides):
 
 
 def test_profile_card_contains_key_fields():
-    card = texts.profile_card(_sample_user())
+    card = cards.profile_card(_sample_user())
     assert "Айгерим" in card
     assert "👩 Девушка" in card          # gender развёрнут из ключа
     assert "Алматы, Бостандык" in card
@@ -49,23 +50,23 @@ def test_profile_card_contains_key_fields():
 
 
 def test_profile_card_handles_missing_about():
-    card = texts.profile_card(_sample_user(about=None))
+    card = cards.profile_card(_sample_user(about=None))
     assert "«—»" in card  # пустое «о себе» заменяется прочерком
 
 
 def test_profile_card_handles_missing_name():
-    card = texts.profile_card(_sample_user(full_name=None))
+    card = cards.profile_card(_sample_user(full_name=None))
     assert "Без имени" in card
 
 
 def test_profile_card_male_gender():
-    card = texts.profile_card(_sample_user(gender="male"))
+    card = cards.profile_card(_sample_user(gender="male"))
     assert "👨 Парень" in card
 
 
 def test_profile_card_budget_shows_up_to():
     """Бюджет ищущего показывается как «до X»."""
-    card = texts.profile_card(_sample_user(budget=10000))
+    card = cards.profile_card(_sample_user(budget=10000))
     assert "💰 до 10 000 тг" in card
 
 
@@ -76,7 +77,7 @@ def test_profile_card_goal_on_top_no_duplicate_emojis():
         move_in="📅 В течение 2 недель",
         occupation="💼 Работаю",
     )
-    card = texts.profile_card(user)
+    card = cards.profile_card(user)
     # цель — первая строка карточки
     assert card.startswith("🔍 Нет жилья — ищу куда подселиться")
     # нет двойных эмодзи
@@ -101,7 +102,7 @@ def test_profile_card_minimal_have_place():
         "occupation": None,
         "about": None,
     }
-    card = texts.profile_card(user)
+    card = cards.profile_card(user)
     assert "Хост" in card
     assert "📍 Алматы" in card
     assert "None" not in card      # пустые поля не протекают как "None"
@@ -125,7 +126,7 @@ def test_profile_card_registration_data_without_habit_keys():
         "occupation": "🏠 Фриланс",
         "about": "Я не курю и не пью",
     }
-    card = texts.profile_card(data)  # не должно бросать KeyError
+    card = cards.profile_card(data)  # не должно бросать KeyError
     assert "Серик" in card
     assert "Астана, Есиль" in card
     assert "💰 до 30 000 тг" in card
@@ -144,7 +145,7 @@ def test_listing_card_provider():
         "budget": 150000,
         "about": "2 комнаты, есть мебель",
     }
-    card = texts.listing_card(user)
+    card = cards.listing_card(user)
     assert card.startswith("🏠 Есть жильё — ищу соседа")
     assert "Астана, Есиль" in card
     assert "150 000 тг/мес" in card
@@ -159,32 +160,32 @@ def test_user_card_dispatch_by_role():
         "role": "provider", "full_name": "Х", "gender": "male", "city": "Алматы",
         "district": None, "preferred_gender": "any", "budget": 120000, "about": None,
     }
-    assert texts.user_card(provider).startswith("🏠 Есть жильё — ищу соседа")
+    assert cards.user_card(provider).startswith("🏠 Есть жильё — ищу соседа")
 
 
 # ---------------------- match_message / user_link ----------------------
 
 def test_user_link_is_clickable_by_id():
-    link = texts.user_link("Аружан", 123456)
+    link = cards.user_link("Аружан", 123456)
     assert link == '<a href="tg://user?id=123456">Аружан</a>'
 
 
 def test_user_link_escapes_html():
     # Спецсимволы в имени экранируются, чтобы не сломать HTML-разметку
-    link = texts.user_link("A<b>&", 1)
+    link = cards.user_link("A<b>&", 1)
     assert "<b>" not in link.replace('<a href="tg://user?id=1">', "")
     assert "&lt;b&gt;&amp;" in link
 
 
 def test_match_message_name_is_link_without_username():
-    msg = texts.match_message("Аружан", None, 555)
+    msg = cards.match_message("Аружан", None, 555)
     assert '<a href="tg://user?id=555">Аружан</a>' in msg
     assert "нет username" not in msg
     assert "У вас мэтч" in msg
 
 
 def test_match_message_with_username():
-    msg = texts.match_message("Аружан", "aruzhan", 555)
+    msg = cards.match_message("Аружан", "aruzhan", 555)
     assert "@aruzhan" in msg
     assert '<a href="tg://user?id=555">Аружан</a>' in msg
 
@@ -205,19 +206,19 @@ def test_incoming_like_header_superlike():
 # ---------------------- HTML-экранирование карточек ----------------------
 
 def test_esc_escapes_html_special_chars():
-    assert texts.esc("A<b>&'\"") == "A&lt;b&gt;&amp;&#x27;&quot;"
-    assert texts.esc(None) == ""
+    assert cards.esc("A<b>&'\"") == "A&lt;b&gt;&amp;&#x27;&quot;"
+    assert cards.esc(None) == ""
 
 
 def test_profile_card_escapes_user_about():
     # Спецсимволы в «о себе» не должны протекать сырыми в HTML-подпись
-    card = texts.profile_card(_sample_user(about="люблю <тишину> & порядок"))
+    card = cards.profile_card(_sample_user(about="люблю <тишину> & порядок"))
     assert "<тишину>" not in card
     assert "&lt;тишину&gt; &amp; порядок" in card
 
 
 def test_profile_card_escapes_name_city_district():
-    card = texts.profile_card(_sample_user(
+    card = cards.profile_card(_sample_user(
         full_name="Иванов & Co", city="Алма<>ты", district="R&D"))
     assert "&amp;" in card
     assert "Алма<>ты" not in card
@@ -225,7 +226,7 @@ def test_profile_card_escapes_name_city_district():
 
 
 def test_listing_card_escapes_user_fields():
-    card = texts.listing_card({
+    card = cards.listing_card({
         "role": "provider", "full_name": "A<b>", "gender": "male",
         "city": "C&C", "district": None, "budget": 100000,
         "about": "жильё <лучшее>",
@@ -236,7 +237,7 @@ def test_listing_card_escapes_user_fields():
 
 
 def test_liked_by_line_escapes_name_and_city():
-    line = texts.liked_by_line(
+    line = cards.liked_by_line(
         {"full_name": "X<i>", "username": None, "city": "T&T"}, is_super=False)
     assert "<i>" not in line
     assert "&lt;i&gt;" in line

@@ -313,9 +313,9 @@ async def _show_card_preview(message: Message, state: FSMContext) -> None:
     await upsert_user(data)
     await state.clear()
 
-    card = texts.listing_card(data) if _is_provider(data) else texts.profile_card(data)
     await send_media_card(
-        message, data, card, reply_markup=inline.profile_menu_kb(data.get("role"))
+        message, data, texts.user_card(data),
+        reply_markup=inline.profile_menu_kb(data.get("role")),
     )
 
 

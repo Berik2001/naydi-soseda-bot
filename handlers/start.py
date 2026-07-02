@@ -11,6 +11,7 @@ from aiogram.types import CallbackQuery, Message
 import texts
 from config import MAX_APARTMENT_PHOTOS, MAX_PROFILE_PHOTOS
 from database.db import get_user, set_active, update_field
+from handlers.matching import start_search
 from handlers.registration import start_registration
 from handlers.render import send_media_card
 from keyboards import inline
@@ -70,8 +71,7 @@ async def cmd_profile(message: Message, state: FSMContext) -> None:
 
 async def send_full_card(message: Message, user, reply_markup=None) -> None:
     """Показать полную карточку (своя анкета/объявление) с прикреплённым меню."""
-    card = texts.listing_card(user) if user["role"] == "provider" else texts.profile_card(user)
-    await send_media_card(message, user, card, reply_markup=reply_markup)
+    await send_media_card(message, user, texts.user_card(user), reply_markup=reply_markup)
 
 
 async def show_updated_profile(message: Message, telegram_id: int) -> None:
@@ -100,7 +100,6 @@ async def profile_feed(call: CallbackQuery) -> None:
         await call.message.answer(texts.SEARCH_PAUSED)
         await call.answer()
         return
-    from handlers.matching import start_search
     await start_search(call.message, user)
     await call.answer()
 

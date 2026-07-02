@@ -13,13 +13,8 @@ from aiogram.types import CallbackQuery, Message
 from handlers.render import send_media_card, send_media_card_to_chat
 
 import texts
-from database.db import (
-    add_like,
-    add_view,
-    get_next_candidate,
-    get_user,
-    has_like,
-)
+from database.matching import add_like, add_view, get_next_candidate, has_like
+from database.users import get_user
 from keyboards import inline
 
 router = Router()

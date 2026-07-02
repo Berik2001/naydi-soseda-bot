@@ -3,8 +3,6 @@
 Команды: /start, /help, /profile, /edit, /pause, /resume.
 """
 
-import asyncio
-
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -12,22 +10,20 @@ from aiogram.types import CallbackQuery, Message
 
 import texts
 from config import MAX_APARTMENT_PHOTOS, MAX_PROFILE_PHOTOS
-from handlers.render import send_media_card
 from database.db import get_user, set_active, update_field
-from handlers.registration import (
-    cancel_done_button,
-    schedule_done_button,
-    start_registration,
-)
+from handlers.registration import start_registration
+from handlers.render import send_media_card
 from keyboards import inline
+from media_flow import (
+    cancel_done_button,
+    collect_album_photo,
+    collect_profile_photo,
+    collect_profile_video,
+)
 from states.form import Edit
 from validators import is_valid_about, parse_budget
 
 router = Router()
-
-# Сериализует чтение-запись списка фото при конкурентной загрузке альбома
-# (aiogram обрабатывает апдейты как параллельные задачи).
-_photos_lock = asyncio.Lock()
 
 # Поля, которые редактируются текстом (остальные — выбором кнопок)
 _TEXT_FIELDS = {"city", "district", "budget", "about"}
@@ -152,14 +148,11 @@ async def profile_apt_photos(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(Edit.waiting_apartment_photos, F.photo)
 async def edit_apt_photo(message: Message, state: FSMContext) -> None:
-    async with _photos_lock:
-        data = await state.get_data()
-        photos = list(data.get("apt_photos") or [])
-        if len(photos) >= MAX_APARTMENT_PHOTOS:
-            return  # больше 10 не добавляем (молча)
-        photos.append(message.photo[-1].file_id)
-        await state.update_data(apt_photos=photos)
-    schedule_done_button(message, state, "aptphoto:done", "apt_photos")
+    await collect_album_photo(
+        message, state,
+        list_key="apt_photos", done_action="aptphoto:done",
+        max_count=MAX_APARTMENT_PHOTOS,
+    )
 
 
 @router.callback_query(Edit.waiting_apartment_photos, F.data == "aptphoto:done")
@@ -198,27 +191,20 @@ async def profile_photo(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(Edit.waiting_photo, F.photo)
 async def profile_photo_set(message: Message, state: FSMContext) -> None:
-    async with _photos_lock:
-        data = await state.get_data()
-        media = list(data.get("new_media") or [])
-        if data.get("new_media_type") == "video":
-            await message.answer(texts.MEDIA_PHOTO_AFTER_VIDEO)
-            return
-        # Берём максимум N фото; лишние из альбома тихо игнорируем
-        if len(media) < MAX_PROFILE_PHOTOS:
-            media.append(message.photo[-1].file_id)
-            await state.update_data(new_media=media, new_media_type="photo")
-    schedule_done_button(message, state, "media:done", "new_media")
+    await collect_profile_photo(
+        message, state,
+        list_key="new_media", type_key="new_media_type",
+        done_action="media:done", max_count=MAX_PROFILE_PHOTOS,
+    )
 
 
 @router.message(Edit.waiting_photo, F.video)
 async def profile_video_set(message: Message, state: FSMContext) -> None:
-    data = await state.get_data()
-    if data.get("new_media") and data.get("new_media_type") == "photo":
-        await message.answer(texts.MEDIA_VIDEO_AFTER_PHOTO)
-        return
-    await state.update_data(new_media=[message.video.file_id], new_media_type="video")
-    schedule_done_button(message, state, "media:done", "__video__")
+    await collect_profile_video(
+        message, state,
+        list_key="new_media", type_key="new_media_type",
+        done_action="media:done",
+    )
 
 
 @router.callback_query(Edit.waiting_photo, F.data == "media:done")

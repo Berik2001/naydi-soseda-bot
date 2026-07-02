@@ -53,16 +53,34 @@ async def _render(user, card_text, reply_markup, *,
         media = [_get(user, "photo_file_id")]
         mtype = "photo"
 
+    # Медиа отправляем «мягко»: если file_id протух (Telegram удалил файл или
+    # сменился токен бота), отправка падает — тогда просто пропускаем картинку,
+    # но текст карточки с кнопками пользователь получает в любом случае.
     if mtype == "video" and media:
-        await send_video(media[0], card_text, reply_markup)
+        try:
+            await send_video(media[0], card_text, reply_markup)
+        except Exception:
+            await send_text(card_text, reply_markup)
     elif mtype == "photo" and len(media) >= 2:
         # Альбом: сначала компактная сетка фото (без подписи), затем текст
         # карточки вместе с кнопками — так не нужно служебное сообщение-подпись.
         album = [InputMediaPhoto(media=f) for f in media[:10]]
-        await send_album(album)
+        try:
+            await send_album(album)
+        except Exception:
+            # Один битый file_id рушит весь альбом — шлём фото по одному,
+            # пропуская сбойные, чтобы показать хотя бы уцелевшие.
+            for f in media[:10]:
+                try:
+                    await send_photo(f, None, None)
+                except Exception:
+                    continue
         await send_text(card_text, reply_markup)
     elif mtype == "photo" and len(media) == 1:
-        await send_photo(media[0], card_text, reply_markup)
+        try:
+            await send_photo(media[0], card_text, reply_markup)
+        except Exception:
+            await send_text(card_text, reply_markup)
     else:
         await send_text(card_text, reply_markup)
 

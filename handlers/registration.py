@@ -12,7 +12,7 @@ from aiogram.types import CallbackQuery, Message
 
 import texts
 from config import MAX_APARTMENT_PHOTOS, MAX_PROFILE_PHOTOS
-from database.db import upsert_user
+from database.users import upsert_user
 from handlers.render import send_media_card
 from keyboards import inline
 from media_flow import (

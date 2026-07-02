@@ -16,7 +16,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand, ErrorEvent
 
 import config
-from database.db import close_pool, create_pool
+from database.pool import close_pool, create_pool
 from handlers import matching, premium, registration, start
 
 logging.basicConfig(

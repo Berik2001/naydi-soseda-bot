@@ -20,7 +20,7 @@ from aiogram.types import (
 
 import texts
 from config import PREMIUM_DAYS, PREMIUM_PAYLOAD, PREMIUM_STARS
-from database.db import (
+from database.premium import (
     activate_premium,
     get_premium_until,
     is_premium,

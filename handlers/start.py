@@ -10,7 +10,7 @@ from aiogram.types import CallbackQuery, Message
 
 import texts
 from config import MAX_APARTMENT_PHOTOS, MAX_PROFILE_PHOTOS
-from database.db import get_user, set_active, update_field
+from database.users import get_user, set_active, update_field
 from handlers.matching import start_search
 from handlers.registration import start_registration
 from handlers.render import send_media_card

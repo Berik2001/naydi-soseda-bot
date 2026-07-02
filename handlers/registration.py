@@ -6,79 +6,28 @@
 остальные поля — готовым русским текстом (из словарей texts).
 """
 
-import asyncio
-
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 import texts
-from config import DONE_BUTTON_DELAY, MAX_APARTMENT_PHOTOS, MAX_PROFILE_PHOTOS
+from config import MAX_APARTMENT_PHOTOS, MAX_PROFILE_PHOTOS
 from database.db import upsert_user
 from handlers.render import send_media_card
 from keyboards import inline
+from media_flow import (
+    cancel_done_button,
+    collect_album_photo,
+    collect_profile_photo,
+    collect_profile_video,
+)
 from states.form import Form
 from validators import is_valid_about, parse_budget
-
-# aiogram обрабатывает апдейты конкурентно (handle_as_tasks=True), поэтому фото
-# из одного альбома приходят параллельно. Лок сериализует чтение-запись списка
-# фото в FSM, иначе часть фото теряется из-за гонки get_data/update_data.
-_photos_lock = asyncio.Lock()
 
 
 def _is_provider(data: dict) -> bool:
     """Роль «сдаёт/имеет жильё»?"""
     return data.get("role") == "provider"
-
-
-# Отложенный показ кнопки «Готово ✅». При загрузке альбома фото приходят
-# пачкой, поэтому кнопку показываем ОДИН раз — с небольшой паузой после
-# последнего фото (иначе счётчик мигает: фото 1, фото 2, ...). Ключ — chat_id.
-_done_tasks: dict = {}
-
-
-async def _post_done_button(message: Message, state: FSMContext, action: str, key: str) -> None:
-    """Удалить предыдущую кнопку и показать одну актуальную с финальным счётчиком."""
-    data = await state.get_data()
-    if key == "__video__":
-        text = texts.VIDEO_PROGRESS
-    else:
-        n = len(data.get(key) or [])
-        if n == 0:
-            return
-        text = texts.photos_progress(n)
-    old_id = data.get("done_msg_id")
-    if old_id:
-        try:
-            await message.bot.delete_message(message.chat.id, old_id)
-        except Exception:  # noqa: BLE001 — сообщение могли удалить/его нет
-            pass
-    sent = await message.answer(text, reply_markup=inline.photos_done_kb(action))
-    await state.update_data(done_msg_id=sent.message_id)
-
-
-async def _delayed_done(message: Message, state: FSMContext, action: str, key: str) -> None:
-    try:
-        await asyncio.sleep(DONE_BUTTON_DELAY)
-    except asyncio.CancelledError:
-        return
-    await _post_done_button(message, state, action, key)
-
-
-def schedule_done_button(message: Message, state: FSMContext, action: str, key: str) -> None:
-    """Показать кнопку «Готово ✅» один раз — через паузу после последнего фото."""
-    chat_id = message.chat.id
-    task = _done_tasks.get(chat_id)
-    if task and not task.done():
-        task.cancel()
-    _done_tasks[chat_id] = asyncio.create_task(_delayed_done(message, state, action, key))
-
-
-def cancel_done_button(chat_id: int) -> None:
-    """Отменить отложенный показ кнопки (при завершении шага)."""
-    task = _done_tasks.pop(chat_id, None)
-    if task and not task.done():
-        task.cancel()
 
 
 router = Router()
@@ -237,15 +186,11 @@ async def step_budget(message: Message, state: FSMContext) -> None:
 
 @router.message(Form.apartment_photos, F.photo)
 async def step_apartment_photo(message: Message, state: FSMContext) -> None:
-    async with _photos_lock:
-        data = await state.get_data()
-        photos = list(data.get("apartment_photos") or [])
-        if len(photos) >= MAX_APARTMENT_PHOTOS:
-            return  # больше 10 не добавляем (молча, без спама сообщениями)
-        photos.append(message.photo[-1].file_id)
-        await state.update_data(apartment_photos=photos)
-    # Кнопку «Готово ✅» показываем один раз — после последнего фото альбома
-    schedule_done_button(message, state, "aptphoto:done", "apartment_photos")
+    await collect_album_photo(
+        message, state,
+        list_key="apartment_photos", done_action="aptphoto:done",
+        max_count=MAX_APARTMENT_PHOTOS,
+    )
 
 
 @router.callback_query(Form.apartment_photos, F.data == "aptphoto:done")
@@ -294,27 +239,20 @@ async def step_listing_about_wrong(message: Message) -> None:
 
 @router.message(Form.photo, F.photo)
 async def step_photo(message: Message, state: FSMContext) -> None:
-    async with _photos_lock:
-        data = await state.get_data()
-        media = list(data.get("profile_media") or [])
-        if data.get("profile_media_type") == "video":
-            await message.answer(texts.MEDIA_PHOTO_AFTER_VIDEO)
-            return
-        # Берём максимум N фото; лишние из альбома тихо игнорируем (без спама)
-        if len(media) < MAX_PROFILE_PHOTOS:
-            media.append(message.photo[-1].file_id)
-            await state.update_data(profile_media=media, profile_media_type="photo")
-    schedule_done_button(message, state, "media:done", "profile_media")
+    await collect_profile_photo(
+        message, state,
+        list_key="profile_media", type_key="profile_media_type",
+        done_action="media:done", max_count=MAX_PROFILE_PHOTOS,
+    )
 
 
 @router.message(Form.photo, F.video)
 async def step_video(message: Message, state: FSMContext) -> None:
-    data = await state.get_data()
-    if data.get("profile_media") and data.get("profile_media_type") == "photo":
-        await message.answer(texts.MEDIA_VIDEO_AFTER_PHOTO)
-        return
-    await state.update_data(profile_media=[message.video.file_id], profile_media_type="video")
-    schedule_done_button(message, state, "media:done", "__video__")
+    await collect_profile_video(
+        message, state,
+        list_key="profile_media", type_key="profile_media_type",
+        done_action="media:done",
+    )
 
 
 @router.callback_query(Form.photo, F.data == "media:done")

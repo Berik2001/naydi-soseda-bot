@@ -23,6 +23,7 @@ class _Recorder:
         self.photos = []               # успешно отправленные фото
         self.videos = []
         self.albums = []
+        self.actions = []
 
     async def send_text(self, t, m):
         self.texts.append(t)
@@ -42,11 +43,16 @@ class _Recorder:
             raise RuntimeError("bad file_id")
         self.albums.append(a)
 
+    async def send_action(self, a):
+        self.actions.append(a)
+
     async def render(self, user, card="CARD", markup="KB"):
+        self.actions = []
         await _render(
             user, card, markup,
             send_text=self.send_text, send_photo=self.send_photo,
             send_video=self.send_video, send_album=self.send_album,
+            send_action=self.send_action,
         )
 
 
@@ -87,4 +93,33 @@ def test_healthy_album_sends_photos_and_text_once():
     rec = _Recorder()
     _run(rec.render(_seeker_photos(["a", "b"])))
     assert len(rec.albums) == 1
+    assert rec.texts == ["CARD"]
+
+
+# ---------------------- loading-индикатор (chat action) ----------------------
+
+def test_loading_action_for_album():
+    rec = _Recorder()
+    _run(rec.render(_seeker_photos(["a", "b"])))
+    assert rec.actions == ["upload_photo"]
+
+
+def test_loading_action_for_single_photo():
+    rec = _Recorder()
+    _run(rec.render(_seeker_photos(["a"])))
+    assert rec.actions == ["upload_photo"]
+
+
+def test_loading_action_for_video():
+    rec = _Recorder()
+    _run(rec.render({"role": "seeker", "profile_media": ["v"],
+                     "profile_media_type": "video"}))
+    assert rec.actions == ["upload_video"]
+
+
+def test_no_loading_action_for_text_only():
+    # Текст мгновенный — индикатор не нужен
+    rec = _Recorder()
+    _run(rec.render({"role": "seeker", "profile_media": [], "profile_media_type": None}))
+    assert rec.actions == []
     assert rec.texts == ["CARD"]

@@ -200,3 +200,44 @@ def test_incoming_like_header_like():
 def test_incoming_like_header_superlike():
     header = texts.incoming_like_header(is_super=True)
     assert "СУПЕР" in header
+
+
+# ---------------------- HTML-экранирование карточек ----------------------
+
+def test_esc_escapes_html_special_chars():
+    assert texts.esc("A<b>&'\"") == "A&lt;b&gt;&amp;&#x27;&quot;"
+    assert texts.esc(None) == ""
+
+
+def test_profile_card_escapes_user_about():
+    # Спецсимволы в «о себе» не должны протекать сырыми в HTML-подпись
+    card = texts.profile_card(_sample_user(about="люблю <тишину> & порядок"))
+    assert "<тишину>" not in card
+    assert "&lt;тишину&gt; &amp; порядок" in card
+
+
+def test_profile_card_escapes_name_city_district():
+    card = texts.profile_card(_sample_user(
+        full_name="Иванов & Co", city="Алма<>ты", district="R&D"))
+    assert "&amp;" in card
+    assert "Алма<>ты" not in card
+    assert "&lt;&gt;" in card
+
+
+def test_listing_card_escapes_user_fields():
+    card = texts.listing_card({
+        "role": "provider", "full_name": "A<b>", "gender": "male",
+        "city": "C&C", "district": None, "budget": 100000,
+        "about": "жильё <лучшее>",
+    })
+    assert "<b>" not in card
+    assert "&lt;b&gt;" in card
+    assert "&lt;лучшее&gt;" in card
+
+
+def test_liked_by_line_escapes_name_and_city():
+    line = texts.liked_by_line(
+        {"full_name": "X<i>", "username": None, "city": "T&T"}, is_super=False)
+    assert "<i>" not in line
+    assert "&lt;i&gt;" in line
+    assert "T&amp;T" in line

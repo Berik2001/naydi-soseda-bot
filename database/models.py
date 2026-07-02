@@ -75,4 +75,10 @@ MIGRATIONS = [
     # девушки с девушками). Приводим старые анкеты, где стояло 'any' или иное.
     "UPDATE users SET preferred_gender = gender "
     "WHERE gender IS NOT NULL AND preferred_gender IS DISTINCT FROM gender",
+    # Индексы под горячие запросы. get_next_candidate фильтрует users по
+    # city+is_active; has_like/who_liked_me ищут likes по to_id (UNIQUE на
+    # (from_id,to_id) такой поиск не покрывает); лента исключает по views.viewer_id.
+    "CREATE INDEX IF NOT EXISTS idx_users_city_active ON users (city, is_active)",
+    "CREATE INDEX IF NOT EXISTS idx_likes_to_id ON likes (to_id)",
+    "CREATE INDEX IF NOT EXISTS idx_views_viewer ON views (viewer_id)",
 ]

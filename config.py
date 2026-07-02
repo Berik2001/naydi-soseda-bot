@@ -47,3 +47,13 @@ def get_database_url() -> str:
     if not dsn:
         raise RuntimeError("Не задан DATABASE_URL в .env")
     return dsn
+
+
+def get_redis_url() -> str | None:
+    """
+    Строка подключения к Redis для FSM-хранилища (опциональна).
+
+    Если задана — состояние регистрации переживает рестарты бота и появляется
+    возможность горизонтального масштаба. Если нет — используется MemoryStorage.
+    """
+    return os.getenv("REDIS_URL") or None

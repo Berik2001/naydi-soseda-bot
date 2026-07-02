@@ -11,6 +11,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.fsm.storage.base import BaseStorage
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand, ErrorEvent
 
@@ -37,6 +38,25 @@ async def on_error(event: ErrorEvent) -> bool:
     return True
 
 
+def build_storage() -> BaseStorage:
+    """
+    Выбрать FSM-хранилище: Redis (если задан REDIS_URL) — состояние переживает
+    рестарты и допускает горизонтальный масштаб; иначе MemoryStorage (состояние
+    теряется при рестарте, только один инстанс). Импорт Redis — ленивый, чтобы
+    зависимость не требовалась, пока REDIS_URL не задан.
+    """
+    redis_url = config.get_redis_url()
+    if redis_url:
+        from aiogram.fsm.storage.redis import RedisStorage
+        logger.info("FSM-хранилище: Redis.")
+        return RedisStorage.from_url(redis_url)
+    logger.info(
+        "FSM-хранилище: в памяти. Для устойчивости к рестартам и масштаба "
+        "задай REDIS_URL."
+    )
+    return MemoryStorage()
+
+
 async def set_commands(bot: Bot) -> None:
     """
     Меню команд бота (кнопка «/» в Telegram).
@@ -59,9 +79,8 @@ async def main() -> None:
     await create_pool(database_url)
     logger.info("Подключение к базе данных установлено, таблицы готовы.")
 
-    # FSM-хранилище в памяти (по требованию ТЗ)
     bot = Bot(token=bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-    dp = Dispatcher(storage=MemoryStorage())
+    dp = Dispatcher(storage=build_storage())
 
     # Порядок важен: сначала роутеры с командами (start/matching/premium),
     # чтобы /profile, /start, /search и т.д. работали ДАЖЕ во время

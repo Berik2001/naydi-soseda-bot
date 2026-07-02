@@ -8,6 +8,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
+import cards
 import texts
 from config import MAX_APARTMENT_PHOTOS, MAX_PROFILE_PHOTOS
 from database.users import get_user, set_active, update_field
@@ -71,7 +72,7 @@ async def cmd_profile(message: Message, state: FSMContext) -> None:
 
 async def send_full_card(message: Message, user, reply_markup=None) -> None:
     """Показать полную карточку (своя анкета/объявление) с прикреплённым меню."""
-    await send_media_card(message, user, texts.user_card(user), reply_markup=reply_markup)
+    await send_media_card(message, user, cards.user_card(user), reply_markup=reply_markup)
 
 
 async def show_updated_profile(message: Message, telegram_id: int) -> None:

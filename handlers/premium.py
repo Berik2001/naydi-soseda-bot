@@ -18,6 +18,7 @@ from aiogram.types import (
     PreCheckoutQuery,
 )
 
+import cards
 import texts
 from config import PREMIUM_DAYS, PREMIUM_PAYLOAD, PREMIUM_STARS
 from database.premium import (
@@ -114,6 +115,6 @@ async def who_liked(call: CallbackQuery) -> None:
 
     lines = [texts.WHO_LIKED_HEADER]
     for r in rows:
-        lines.append(texts.liked_by_line(r, r["is_super"]))
+        lines.append(cards.liked_by_line(r, r["is_super"]))
     await call.message.answer("\n".join(lines))
     await call.answer()

@@ -20,10 +20,34 @@ from database.pool import close_pool, create_pool
 from handlers import matching, premium, registration, start
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, config.get_log_level(), logging.INFO),
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+def init_sentry() -> None:
+    """
+    Включить трекинг ошибок Sentry, если задан SENTRY_DSN.
+
+    LoggingIntegration сам ловит logger.error/exception (в т.ч. глобальный
+    on_error) и шлёт в Sentry со стектрейсом. Импорт ленивый — зависимость не
+    нужна, пока DSN не задан; сбой инициализации не роняет бота.
+    """
+    dsn = config.get_sentry_dsn()
+    if not dsn:
+        logger.info("Sentry: выключен (SENTRY_DSN не задан).")
+        return
+    try:
+        import sentry_sdk
+        sentry_sdk.init(
+            dsn=dsn,
+            environment=config.get_environment(),
+            traces_sample_rate=0.0,  # трейсинг производительности не нужен боту
+        )
+        logger.info("Sentry: включён.")
+    except Exception as exc:  # noqa: BLE001 — наблюдаемость не должна ронять прод
+        logger.error("Sentry не инициализировался (%s) — продолжаю без него.", exc)
 
 
 async def on_error(event: ErrorEvent) -> bool:
@@ -80,6 +104,9 @@ async def set_commands(bot: Bot) -> None:
 
 
 async def main() -> None:
+    # Наблюдаемость поднимаем первой — чтобы ловить и ошибки старта (БД и т.п.)
+    init_sentry()
+
     # Секреты валидируются здесь (config бросит понятную ошибку, если их нет)
     bot_token = config.get_bot_token()
     database_url = config.get_database_url()

@@ -57,7 +57,15 @@ cp .env.example .env
 Опциональные (см. комментарии в `.env.example`):
 - `REDIS_URL` — FSM-хранилище в Redis (устойчивость к рестартам + масштаб); без него используется память;
 - `DB_POOL_MIN_SIZE` / `DB_POOL_MAX_SIZE` — размер пула asyncpg (дефолты 1 / 5);
-- `DB_STATEMENT_CACHE_SIZE` — выставь `0` при работе через Transaction-mode пулер.
+- `DB_STATEMENT_CACHE_SIZE` — выставь `0` при работе через Transaction-mode пулер;
+- `SENTRY_DSN` — трекинг ошибок в Sentry (без него выключен);
+- `LOG_LEVEL` — уровень логов (по умолчанию `INFO`);
+- `ENVIRONMENT` — тег окружения для Sentry (по умолчанию `production`).
+
+### Наблюдаемость и контейнер
+
+- **Ошибки:** задай `SENTRY_DSN` — исключения (включая глобальный обработчик) уходят в Sentry со стектрейсом и алертами.
+- **Docker:** есть `Dockerfile` для переносимости (`docker build -t roommate-bot . && docker run --env-file .env roommate-bot`). На Railway сборка идёт через nixpacks (см. `railway.toml`), Dockerfile там не используется.
 
 ### 3. База данных
 

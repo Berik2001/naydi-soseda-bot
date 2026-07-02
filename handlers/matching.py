@@ -159,17 +159,22 @@ async def on_decline(call: CallbackQuery) -> None:
 
 async def _notify_match(bot: Bot, user_a: int, user_b: int) -> None:
     """Отправить обоим участникам сообщение о мэтче."""
-    a = await get_user(user_a)
-    b = await get_user(user_b)
+    # Профили обоих читаем разом (независимые запросы)
+    a, b = await asyncio.gather(get_user(user_a), get_user(user_b))
     if a is None or b is None:
         return
 
-    # Пишем каждому контакт другого (имя — кликабельная ссылка на профиль)
-    await bot.send_message(
-        user_a, texts.match_message(b["full_name"], b["username"], b["telegram_id"])
-    )
-    await bot.send_message(
-        user_b, texts.match_message(a["full_name"], a["username"], a["telegram_id"])
+    # Пишем каждому контакт другого (имя — кликабельная ссылка на профиль).
+    # Доставка best-effort: если один заблокировал бота, второй всё равно
+    # получает уведомление (return_exceptions гасит ошибку отправки).
+    await asyncio.gather(
+        bot.send_message(
+            user_a, texts.match_message(b["full_name"], b["username"], b["telegram_id"])
+        ),
+        bot.send_message(
+            user_b, texts.match_message(a["full_name"], a["username"], a["telegram_id"])
+        ),
+        return_exceptions=True,
     )
 
 

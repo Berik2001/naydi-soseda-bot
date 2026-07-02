@@ -48,17 +48,10 @@ def city_kb() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def skip_photo_kb() -> InlineKeyboardMarkup:
-    """Шаг 12 — кнопка «Пропустить» для фото."""
+def photo_skip_kb(action: str) -> InlineKeyboardMarkup:
+    """Кнопка «Пропустить» на шаге фото (фото необязательны). action — callback."""
     builder = InlineKeyboardBuilder()
-    builder.button(text="Пропустить", callback_data="skip:photo")
-    return builder.as_markup()
-
-
-def skip_about_kb() -> InlineKeyboardMarkup:
-    """Шаг 13 — кнопка «Пропустить» для «о себе»."""
-    builder = InlineKeyboardBuilder()
-    builder.button(text="Пропустить", callback_data="skip:about")
+    builder.button(text="Пропустить ➡️", callback_data=action)
     return builder.as_markup()
 
 

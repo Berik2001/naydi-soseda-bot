@@ -23,7 +23,7 @@ def _get(obj, key):
 
 
 async def _render(user, card_text, reply_markup, *,
-                  send_text, send_photo, send_video, send_album) -> None:
+                  send_text, send_photo, send_video, send_album, send_action=None) -> None:
     """
     Общая логика отрисовки карточки. Способ отправки задаётся колбэками —
     так один и тот же рендер работает и через message.answer_* (ответ в чат),
@@ -37,6 +37,10 @@ async def _render(user, card_text, reply_markup, *,
     - ровно 1 фото → обычное фото с подписью (одиночное фото Telegram всегда
       показывает крупно — это его поведение, через Bot API не уменьшить).
     - видео → видео с подписью.
+
+    send_action (опц.) — колбэк chat-action ("upload_photo"/"upload_video"):
+    показывает индикатор «отправляет фото…», пока грузится медиа. Только на
+    интерактивном пути (ответ активному пользователю), не при фоновых пушах.
     """
     role = _get(user, "role")
 
@@ -57,6 +61,8 @@ async def _render(user, card_text, reply_markup, *,
     # сменился токен бота), отправка падает — тогда просто пропускаем картинку,
     # но текст карточки с кнопками пользователь получает в любом случае.
     if mtype == "video" and media:
+        if send_action:
+            await send_action("upload_video")
         try:
             await send_video(media[0], card_text, reply_markup)
         except Exception:
@@ -64,6 +70,8 @@ async def _render(user, card_text, reply_markup, *,
     elif mtype == "photo" and len(media) >= 2:
         # Альбом: сначала компактная сетка фото (без подписи), затем текст
         # карточки вместе с кнопками — так не нужно служебное сообщение-подпись.
+        if send_action:
+            await send_action("upload_photo")
         album = [InputMediaPhoto(media=f) for f in media[:10]]
         try:
             await send_album(album)
@@ -77,22 +85,30 @@ async def _render(user, card_text, reply_markup, *,
                     continue
         await send_text(card_text, reply_markup)
     elif mtype == "photo" and len(media) == 1:
+        if send_action:
+            await send_action("upload_photo")
         try:
             await send_photo(media[0], card_text, reply_markup)
         except Exception:
             await send_text(card_text, reply_markup)
     else:
+        # Только текст — мгновенно, индикатор не нужен
         await send_text(card_text, reply_markup)
 
 
 async def send_media_card(message: Message, user, card_text: str, reply_markup=None) -> None:
-    """Отправить карточку с медиа и кнопками в ответ на сообщение."""
+    """Отправить карточку с медиа и кнопками в ответ на сообщение.
+
+    Перед загрузкой медиа показываем chat-action «отправляет фото…» — карточка
+    воспринимается отзывчивой, пока Telegram подтягивает файлы.
+    """
     await _render(
         user, card_text, reply_markup,
         send_text=lambda t, m: message.answer(t, reply_markup=m),
         send_photo=lambda f, c, m: message.answer_photo(f, caption=c, reply_markup=m),
         send_video=lambda f, c, m: message.answer_video(f, caption=c, reply_markup=m),
         send_album=lambda a: message.answer_media_group(a),
+        send_action=lambda a: message.bot.send_chat_action(message.chat.id, a),
     )
 
 

@@ -7,23 +7,16 @@
 
 import asyncio
 import logging
-import os
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand
-from dotenv import load_dotenv
 
+import config
 from database.db import close_pool, create_pool
 from handlers import matching, premium, registration, start
-
-# Загружаем переменные окружения из .env
-load_dotenv()
-
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-DATABASE_URL = os.getenv("DATABASE_URL")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,17 +39,16 @@ async def set_commands(bot: Bot) -> None:
 
 
 async def main() -> None:
-    if not BOT_TOKEN:
-        raise RuntimeError("Не задан BOT_TOKEN в .env")
-    if not DATABASE_URL:
-        raise RuntimeError("Не задан DATABASE_URL в .env")
+    # Секреты валидируются здесь (config бросит понятную ошибку, если их нет)
+    bot_token = config.get_bot_token()
+    database_url = config.get_database_url()
 
     # Создаём пул соединений с БД и таблицы
-    await create_pool(DATABASE_URL)
+    await create_pool(database_url)
     logger.info("Подключение к базе данных установлено, таблицы готовы.")
 
     # FSM-хранилище в памяти (по требованию ТЗ)
-    bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    bot = Bot(token=bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher(storage=MemoryStorage())
 
     # Порядок важен: сначала роутеры с командами (start/matching/premium),

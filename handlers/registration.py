@@ -13,14 +13,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 import texts
+from config import DONE_BUTTON_DELAY, MAX_APARTMENT_PHOTOS, MAX_PROFILE_PHOTOS
 from database.db import upsert_user
 from handlers.render import send_media_card
 from keyboards import inline
 from states.form import Form
 from validators import is_valid_about, parse_budget
-
-# Максимум фото квартиры в объявлении
-MAX_APARTMENT_PHOTOS = 10
 
 # aiogram обрабатывает апдейты конкурентно (handle_as_tasks=True), поэтому фото
 # из одного альбома приходят параллельно. Лок сериализует чтение-запись списка
@@ -37,7 +35,6 @@ def _is_provider(data: dict) -> bool:
 # пачкой, поэтому кнопку показываем ОДИН раз — с небольшой паузой после
 # последнего фото (иначе счётчик мигает: фото 1, фото 2, ...). Ключ — chat_id.
 _done_tasks: dict = {}
-_DONE_DELAY = 0.8  # сек тишины после последнего фото → показать кнопку
 
 
 async def _post_done_button(message: Message, state: FSMContext, action: str, key: str) -> None:
@@ -62,7 +59,7 @@ async def _post_done_button(message: Message, state: FSMContext, action: str, ke
 
 async def _delayed_done(message: Message, state: FSMContext, action: str, key: str) -> None:
     try:
-        await asyncio.sleep(_DONE_DELAY)
+        await asyncio.sleep(DONE_BUTTON_DELAY)
     except asyncio.CancelledError:
         return
     await _post_done_button(message, state, action, key)
@@ -303,8 +300,8 @@ async def step_photo(message: Message, state: FSMContext) -> None:
         if data.get("profile_media_type") == "video":
             await message.answer(texts.MEDIA_PHOTO_AFTER_VIDEO)
             return
-        # Берём максимум 2 фото; лишние из альбома тихо игнорируем (без спама)
-        if len(media) < 2:
+        # Берём максимум N фото; лишние из альбома тихо игнорируем (без спама)
+        if len(media) < MAX_PROFILE_PHOTOS:
             media.append(message.photo[-1].file_id)
             await state.update_data(profile_media=media, profile_media_type="photo")
     schedule_done_button(message, state, "media:done", "profile_media")

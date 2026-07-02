@@ -10,16 +10,9 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from handlers.render import send_media_card
-
-# Максимум фото квартиры (как в регистрации)
-MAX_APARTMENT_PHOTOS = 10
-
-# Сериализует чтение-запись списка фото при конкурентной загрузке альбома
-# (aiogram обрабатывает апдейты как параллельные задачи).
-_photos_lock = asyncio.Lock()
-
 import texts
+from config import MAX_APARTMENT_PHOTOS, MAX_PROFILE_PHOTOS
+from handlers.render import send_media_card
 from database.db import get_user, set_active, update_field
 from handlers.registration import (
     cancel_done_button,
@@ -31,6 +24,10 @@ from states.form import Edit
 from validators import is_valid_about, parse_budget
 
 router = Router()
+
+# Сериализует чтение-запись списка фото при конкурентной загрузке альбома
+# (aiogram обрабатывает апдейты как параллельные задачи).
+_photos_lock = asyncio.Lock()
 
 # Поля, которые редактируются текстом (остальные — выбором кнопок)
 _TEXT_FIELDS = {"city", "district", "budget", "about"}
@@ -207,8 +204,8 @@ async def profile_photo_set(message: Message, state: FSMContext) -> None:
         if data.get("new_media_type") == "video":
             await message.answer(texts.MEDIA_PHOTO_AFTER_VIDEO)
             return
-        # Берём максимум 2 фото; лишние из альбома тихо игнорируем
-        if len(media) < 2:
+        # Берём максимум N фото; лишние из альбома тихо игнорируем
+        if len(media) < MAX_PROFILE_PHOTOS:
             media.append(message.photo[-1].file_id)
             await state.update_data(new_media=media, new_media_type="photo")
     schedule_done_button(message, state, "media:done", "new_media")

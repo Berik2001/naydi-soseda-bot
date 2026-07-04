@@ -17,8 +17,9 @@ from aiogram.types import CallbackQuery, Message
 from handlers.render import send_media_card, send_media_card_to_chat
 
 import cards
+import config
 import texts
-from database.matching import add_view, get_next_candidate, register_like
+from database.matching import add_view, get_next_candidate, like_usage, register_like
 from database.users import get_user
 from keyboards import inline
 from tg_retry import with_flood_retry
@@ -119,6 +120,14 @@ async def _process_like(call: CallbackQuery, bot: Bot, is_super: bool) -> None:
     if candidate_id is None:
         await call.answer()
         return
+
+    # Дневной лимит лайков (бесплатным). Премиум не ограничиваем. Пропуск (👎) и
+    # приём входящего лайка (on_accept) лимит НЕ тратят — только проактивный лайк.
+    if config.FREE_DAILY_LIKES > 0:
+        is_prem, used = await like_usage(viewer_id)
+        if not is_prem and used >= config.FREE_DAILY_LIKES:
+            await call.answer(texts.LIKE_LIMIT_ALERT, show_alert=True)
+            return  # карточку и кнопки оставляем — можно листать пропуском
 
     # Просмотр + лайк + проверка встречного лайка — одним соединением пула.
     # is_new=False, если лайк уже стоял (повторный или подделанный коллбэк):

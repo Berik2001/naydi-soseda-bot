@@ -188,6 +188,37 @@ def test_delete_old_views_none_stale_returns_zero():
     run(scenario)
 
 
+def test_like_usage_counts_and_premium_flag():
+    async def scenario():
+        await users.upsert_user(_user(1, role="seeker"))
+        await users.upsert_user(_user(2, role="provider"))
+        await users.upsert_user(_user(3, role="provider"))
+
+        await matching.register_like(1, 2)
+        await matching.register_like(1, 3)
+        is_prem, used = await matching.like_usage(1)
+        assert is_prem is False
+        assert used == 2                                           # два свежих лайка
+
+        await premium.activate_premium(1, 30)
+        is_prem, _ = await matching.like_usage(1)
+        assert is_prem is True                                     # премиум распознан
+    run(scenario)
+
+
+def test_like_usage_ignores_old_likes():
+    async def scenario():
+        await users.upsert_user(_user(1, role="seeker"))
+        await users.upsert_user(_user(2, role="provider"))
+        async with db_pool.get_pool().acquire() as conn:
+            await conn.execute(
+                "INSERT INTO likes (from_id, to_id, created_at) "
+                "VALUES ($1, $2, now() - interval '2 days')", 1, 2)
+        _, used = await matching.like_usage(1)
+        assert used == 0                                           # старые (>24ч) не в счёт
+    run(scenario)
+
+
 def test_who_liked_me_lists_active_likers():
     async def scenario():
         await users.upsert_user(_user(1, role="seeker"))

@@ -20,6 +20,21 @@ def test_statement_cache_size_zero_for_txn_pooler(monkeypatch):
     assert config.get_statement_cache_size() == 0
 
 
+def test_command_timeout_default_none(monkeypatch):
+    monkeypatch.delenv("DB_COMMAND_TIMEOUT", raising=False)
+    assert config.get_command_timeout() is None
+
+
+def test_command_timeout_empty_is_none(monkeypatch):
+    monkeypatch.setenv("DB_COMMAND_TIMEOUT", "")
+    assert config.get_command_timeout() is None
+
+
+def test_command_timeout_parsed_as_float(monkeypatch):
+    monkeypatch.setenv("DB_COMMAND_TIMEOUT", "30")
+    assert config.get_command_timeout() == 30.0
+
+
 def test_int_env_fallback_and_parse(monkeypatch):
     monkeypatch.delenv("DB_POOL_MAX_SIZE", raising=False)
     assert config._int_env("DB_POOL_MAX_SIZE", 5) == 5

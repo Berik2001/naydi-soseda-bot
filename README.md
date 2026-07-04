@@ -127,8 +127,9 @@ roommate_bot/
 Всё включается переменными окружения, без правки кода:
 
 1. **Устойчивый FSM** — задай `REDIS_URL` (Redis/Upstash). Незаполненные анкеты переживают редеплой.
-2. **Больше соединений к БД** — при росте нагрузки переключи `DATABASE_URL` на **Transaction-mode пулер** Supabase (порт `6543`), выстави `DB_STATEMENT_CACHE_SIZE=0` и подними `DB_POOL_MAX_SIZE`.
+2. **Больше соединений к БД** — при росте нагрузки переключи `DATABASE_URL` на **Transaction-mode пулер** Supabase (порт `6543`), выстави `DB_STATEMENT_CACHE_SIZE=0`, подними `DB_POOL_MAX_SIZE` (напр. `20`) и задай `DB_COMMAND_TIMEOUT` (напр. `30`), чтобы зависший запрос не держал слот пула. Готовый пресет — в `.env.example`.
 3. **Несколько инстансов** — возможно (FSM в Redis + миграции под advisory-lock). Следующий шаг для очень большой нагрузки — перейти с long polling на webhooks за балансировщиком.
+4. **Anti-flood** — throttling-middleware ([middlewares/throttling.py](middlewares/throttling.py)) отсекает спам-апдейты до хендлеров, защищая пул БД. Пороги — в конструкторе `ThrottlingMiddleware`. In-memory (на один инстанс); при масштабе на несколько инстансов вынеси состояние в Redis.
 
 ## 🔒 Безопасность
 

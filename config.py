@@ -57,6 +57,22 @@ def get_statement_cache_size() -> int | None:
     return int(raw) if raw not in (None, "") else None
 
 
+def get_command_timeout() -> float | None:
+    """
+    Таймаут выполнения одного запроса asyncpg, в секундах (по умолчанию None —
+    без лимита, поведение не меняем).
+
+    Зачем под нагрузкой: пул маленький (DB_POOL_MAX_SIZE), и один зависший
+    запрос держит соединение, приближая исчерпание пула → отказ для всех.
+    Таймаут обрывает такой запрос и возвращает слот в пул.
+
+    Осторожно: слишком малое значение обрубит тяжёлые стартовые бэкфилл-миграции
+    на большой таблице. Ставь с запасом (напр. 30–60).
+    """
+    raw = os.getenv("DB_COMMAND_TIMEOUT")
+    return float(raw) if raw not in (None, "") else None
+
+
 # ====================== ПРЕМИУМ (Telegram Stars) ======================
 
 PREMIUM_STARS = 150             # цена в Telegram Stars

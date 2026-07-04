@@ -228,9 +228,6 @@ async def step_apartment_photos_skip(call: CallbackQuery, state: FSMContext) -> 
     except Exception:  # noqa: BLE001
         pass
     await call.answer()
-    data = await state.get_data()
-    if not (data.get("apartment_photos") or []):
-        await call.message.answer(texts.PHOTO_SKIP_HINT)
     await _go_to_listing_about(call.message, state)
 
 
@@ -309,9 +306,6 @@ async def step_photo_skip(call: CallbackQuery, state: FSMContext) -> None:
     except Exception:  # noqa: BLE001
         pass
     await call.answer()
-    data = await state.get_data()
-    if not (data.get("profile_media") or []):
-        await call.message.answer(texts.PHOTO_SKIP_HINT)
     await _go_to_about(call.message, state)
 
 

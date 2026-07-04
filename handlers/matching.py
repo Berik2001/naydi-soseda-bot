@@ -3,6 +3,8 @@
 Поиск сожителей (/search) и логика лайков / взаимных мэтчей.
 """
 
+from __future__ import annotations  # поддержка "X | None" на Python 3.9
+
 import asyncio
 import logging
 
@@ -179,7 +181,8 @@ async def on_accept(call: CallbackQuery, bot: Bot) -> None:
 
 @router.callback_query(F.data.startswith("decline:"))
 async def on_decline(call: CallbackQuery) -> None:
-    """«Отказаться» — помечаем лайкнувшего просмотренным, больше не показываем."""
+    """«Отказаться» — помечаем лайкнувшего просмотренным и сразу возвращаем
+    пользователя к его собственной анкете с меню действий."""
     liker_id = _parse_target_id(call.data)
     if liker_id is None:
         await call.answer()
@@ -187,6 +190,9 @@ async def on_decline(call: CallbackQuery) -> None:
     await add_view(call.from_user.id, liker_id)
     await _remove_buttons(call)
     await call.answer(texts.MATCH_DECLINED)
+    # Ленивый импорт разрывает цикл импорта (start импортирует matching).
+    from handlers.start import show_updated_profile
+    await show_updated_profile(call.message, call.from_user.id)
 
 
 async def _notify_match(bot: Bot, user_a: int, user_b: int) -> None:

@@ -8,10 +8,7 @@
 
 from __future__ import annotations  # поддержка "X | None" на Python 3.9
 
-from aiogram.types import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-)
+from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 import texts
@@ -58,12 +55,16 @@ def photo_skip_kb(action: str) -> InlineKeyboardMarkup:
 # ====================== МЭТЧИНГ ======================
 
 def match_kb(candidate_id: int) -> InlineKeyboardMarkup:
-    """Кнопки под карточкой кандидата."""
+    """Кнопки под карточкой кандидата.
+
+    Супер-лайк временно скрыт: кнопку убрали, но обработчик super: в
+    handlers/matching.py оставлен — вернуть фичу можно одной строкой (добавить
+    кнопку обратно и поправить adjust).
+    """
     builder = InlineKeyboardBuilder()
     builder.button(text="❤️ Интересно", callback_data=f"like:{candidate_id}")
     builder.button(text="👎 Пропустить", callback_data=f"pass:{candidate_id}")
-    builder.button(text="⭐ Супер-лайк", callback_data=f"super:{candidate_id}")
-    builder.adjust(2, 1)
+    builder.adjust(2)
     return builder.as_markup()
 
 

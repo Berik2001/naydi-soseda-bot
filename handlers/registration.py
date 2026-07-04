@@ -23,7 +23,7 @@ from media_flow import (
     collect_profile_video,
 )
 from states.form import Form
-from validators import is_valid_about, parse_budget
+from validators import clean_location, is_valid_about, parse_budget
 
 
 def _is_provider(data: dict) -> bool:
@@ -126,7 +126,7 @@ async def step_city(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(Form.city_custom, F.text)
 async def step_city_custom(message: Message, state: FSMContext) -> None:
-    city = message.text.strip()
+    city = clean_location(message.text)
     await state.update_data(city=city)
     await _ask_district(message, state)
 
@@ -143,7 +143,7 @@ async def _ask_district(message: Message, state: FSMContext):
 
 @router.message(Form.district_custom, F.text)
 async def step_district_custom(message: Message, state: FSMContext) -> None:
-    await state.update_data(district=message.text.strip())
+    await state.update_data(district=clean_location(message.text))
     await _ask_budget_or_price(message, state, edit=False)
 
 

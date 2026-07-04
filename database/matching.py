@@ -96,3 +96,61 @@ async def has_like(from_id: int, to_id: int) -> bool:
             from_id, to_id,
         )
         return row is not None
+
+
+async def register_like(
+    from_id: int, to_id: int, is_super: bool = False
+) -> tuple[bool, bool]:
+    """
+    Отметить просмотр, поставить лайк и проверить встречный лайк — всё за ОДИН
+    заход в пул (одно соединение вместо трёх acquire). Возвращает кортеж
+    (is_new_like, reciprocal):
+
+      is_new_like — лайк поставлен ВПЕРВЫЕ (а не повтор уже существующего).
+        По нему хендлер решает, слать ли получателю уведомление «тебя лайкнули».
+        Это защита от спама: подделанный/повторный коллбэк «like:<id>» больше не
+        шлёт жертве новое уведомление на каждый клик — только один раз.
+
+      reciprocal — получатель ранее уже лайкнул нас (значит, взаимный мэтч).
+
+    Признак «впервые» берём из RETURNING (xmax = 0): при INSERT xmax=0, при
+    срабатывании ON CONFLICT ... DO UPDATE строка обновляется и xmax<>0.
+    """
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO views (viewer_id, viewed_id) VALUES ($1, $2) "
+            "ON CONFLICT (viewer_id, viewed_id) DO NOTHING",
+            from_id, to_id,
+        )
+        inserted = await conn.fetchval(
+            "INSERT INTO likes (from_id, to_id, is_super) VALUES ($1, $2, $3) "
+            "ON CONFLICT (from_id, to_id) DO UPDATE SET is_super = EXCLUDED.is_super "
+            "RETURNING (xmax = 0)",
+            from_id, to_id, is_super,
+        )
+        reciprocal = await conn.fetchval(
+            "SELECT EXISTS (SELECT 1 FROM likes WHERE from_id = $1 AND to_id = $2)",
+            to_id, from_id,
+        )
+        return bool(inserted), bool(reciprocal)
+
+
+async def delete_old_views(days: int) -> int:
+    """
+    Удалить просмотры старше `days` дней. Возвращает число удалённых строк.
+
+    Ограничивает рост таблицы views (растёт на каждый свайп). Повторный показ
+    давно просмотренных анкет — ожидаемое поведение: ситуация людей со временем
+    меняется. Лайки при этом НЕ трогаем, поэтому повторный лайк того же человека
+    не пере-уведомляет (register_like вернёт is_new=False).
+    """
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        status = await conn.execute(
+            "DELETE FROM views WHERE created_at < now() - make_interval(days => $1)",
+            days,
+        )
+    # asyncpg отдаёт тег команды вида "DELETE <n>"
+    parts = status.split()
+    return int(parts[1]) if len(parts) == 2 and parts[1].isdigit() else 0

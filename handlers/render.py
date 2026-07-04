@@ -13,6 +13,8 @@
 
 from aiogram.types import InputMediaPhoto, Message
 
+from tg_retry import with_flood_retry
+
 
 def _get(obj, key):
     """Достать поле и из dict (FSM data), и из asyncpg.Record; None если нет."""
@@ -102,12 +104,16 @@ async def send_media_card(message: Message, user, card_text: str, reply_markup=N
     Перед загрузкой медиа показываем chat-action «отправляет фото…» — карточка
     воспринимается отзывчивой, пока Telegram подтягивает файлы.
     """
+    # Каждый примитив отправки переживает флуд-лимит Telegram (429) независимо:
+    # send_media_group — один атомарный вызов, поэтому повтор не даёт дублей.
     await _render(
         user, card_text, reply_markup,
-        send_text=lambda t, m: message.answer(t, reply_markup=m),
-        send_photo=lambda f, c, m: message.answer_photo(f, caption=c, reply_markup=m),
-        send_video=lambda f, c, m: message.answer_video(f, caption=c, reply_markup=m),
-        send_album=lambda a: message.answer_media_group(a),
+        send_text=lambda t, m: with_flood_retry(lambda: message.answer(t, reply_markup=m)),
+        send_photo=lambda f, c, m: with_flood_retry(
+            lambda: message.answer_photo(f, caption=c, reply_markup=m)),
+        send_video=lambda f, c, m: with_flood_retry(
+            lambda: message.answer_video(f, caption=c, reply_markup=m)),
+        send_album=lambda a: with_flood_retry(lambda: message.answer_media_group(a)),
         send_action=lambda a: message.bot.send_chat_action(message.chat.id, a),
     )
 
@@ -118,10 +124,15 @@ async def send_media_card_to_chat(bot, chat_id: int, user, card_text: str,
     То же, но отправка инициируется ботом в конкретный чат — для уведомлений
     (например, «тебя лайкнули»), когда получатель сейчас ничего боту не писал.
     """
+    # Уведомления шлём в чужой чат под нагрузкой (всплеск лайков/мэтчей) — каждый
+    # примитив переживает флуд-лимит Telegram (429), чтобы уведомление не терялось.
     await _render(
         user, card_text, reply_markup,
-        send_text=lambda t, m: bot.send_message(chat_id, t, reply_markup=m),
-        send_photo=lambda f, c, m: bot.send_photo(chat_id, f, caption=c, reply_markup=m),
-        send_video=lambda f, c, m: bot.send_video(chat_id, f, caption=c, reply_markup=m),
-        send_album=lambda a: bot.send_media_group(chat_id, a),
+        send_text=lambda t, m: with_flood_retry(
+            lambda: bot.send_message(chat_id, t, reply_markup=m)),
+        send_photo=lambda f, c, m: with_flood_retry(
+            lambda: bot.send_photo(chat_id, f, caption=c, reply_markup=m)),
+        send_video=lambda f, c, m: with_flood_retry(
+            lambda: bot.send_video(chat_id, f, caption=c, reply_markup=m)),
+        send_album=lambda a: with_flood_retry(lambda: bot.send_media_group(chat_id, a)),
     )

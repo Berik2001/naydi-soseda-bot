@@ -88,4 +88,13 @@ MIGRATIONS = [
     (10, "CREATE INDEX IF NOT EXISTS idx_users_city_active ON users (city, is_active)"),
     (11, "CREATE INDEX IF NOT EXISTS idx_likes_to_id ON likes (to_id)"),
     (12, "CREATE INDEX IF NOT EXISTS idx_views_viewer ON views (viewer_id)"),
+    # Индекс под периодическую чистку старых просмотров (DELETE ... WHERE
+    # created_at < ...): без него удаление шло бы полным сканом таблицы views.
+    (13, "CREATE INDEX IF NOT EXISTS idx_views_created ON views (created_at)"),
+    # Индекс под сортировку ленты get_next_candidate: фильтр city+is_active уже
+    # покрыт (10), а добавленный created_at DESC отдаёт кандидатов почти в нужном
+    # порядке — Postgres не сортирует всех заново на каждый свайп (premium-строк
+    # мало, они лишь досортировываются сверху). users пишется редко (строка на
+    # пользователя), поэтому лишний индекс здесь почти бесплатен.
+    (14, "CREATE INDEX IF NOT EXISTS idx_users_feed ON users (city, is_active, created_at DESC)"),
 ]

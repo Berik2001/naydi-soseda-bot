@@ -44,7 +44,7 @@ jobs:
         run: ruff check --select=E9,F63,F7,F82 .
 
       - name: Проверка компиляции всех модулей
-        run: python -m compileall -q bot.py config.py texts.py cards.py media_flow.py validators.py database handlers keyboards states
+        run: python -m compileall -q bot.py config.py texts.py cards.py media_flow.py validators.py tg_retry.py database handlers keyboards states middlewares
 
       - name: Тесты (pytest)
         env:

@@ -7,6 +7,8 @@ from validators import (
     ABOUT_MAX_LEN,
     BUDGET_MAX,
     BUDGET_MIN,
+    LOCATION_MAX_LEN,
+    clean_location,
     is_valid_about,
     parse_budget,
 )
@@ -85,3 +87,22 @@ def test_about_exactly_at_limit():
 
 def test_about_over_limit_rejected():
     assert is_valid_about("a" * (ABOUT_MAX_LEN + 1)) is False
+
+
+# ---------------------- clean_location ----------------------
+
+def test_clean_location_strips_whitespace():
+    assert clean_location("  Алматы  ") == "Алматы"
+
+
+def test_clean_location_within_limit_untouched():
+    assert clean_location("Есильский район") == "Есильский район"
+
+
+def test_clean_location_truncates_over_limit():
+    long = "я" * (LOCATION_MAX_LEN + 50)
+    assert clean_location(long) == "я" * LOCATION_MAX_LEN
+
+
+def test_clean_location_strips_then_truncates():
+    assert clean_location("  " + "x" * (LOCATION_MAX_LEN + 10) + "  ") == "x" * LOCATION_MAX_LEN

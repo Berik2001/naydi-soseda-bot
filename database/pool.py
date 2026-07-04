@@ -10,7 +10,12 @@ from __future__ import annotations  # поддержка синтаксиса "X
 
 import asyncpg
 
-from config import DB_POOL_MAX_SIZE, DB_POOL_MIN_SIZE, get_statement_cache_size
+from config import (
+    DB_POOL_MAX_SIZE,
+    DB_POOL_MIN_SIZE,
+    get_command_timeout,
+    get_statement_cache_size,
+)
 from database.models import ALL_TABLES, MIGRATIONS
 
 # Глобальный пул соединений
@@ -33,6 +38,11 @@ async def create_pool(dsn: str) -> asyncpg.Pool:
     scs = get_statement_cache_size()
     if scs is not None:
         kwargs["statement_cache_size"] = scs
+    # Таймаут запроса: под нагрузкой не даёт зависшему запросу держать соединение
+    # и исчерпать маленький пул. По умолчанию None → в create_pool не передаём.
+    cmd_timeout = get_command_timeout()
+    if cmd_timeout is not None:
+        kwargs["command_timeout"] = cmd_timeout
     _pool = await asyncpg.create_pool(dsn=dsn, **kwargs)
     await init_db()
     return _pool

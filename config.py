@@ -45,6 +45,17 @@ DB_POOL_MIN_SIZE = _int_env("DB_POOL_MIN_SIZE", 1)
 DB_POOL_MAX_SIZE = _int_env("DB_POOL_MAX_SIZE", 5)
 
 
+# ====================== ЧИСТКА ПРОСМОТРОВ ======================
+# Таблица views растёт на каждый свайп. Фоновая задача периодически удаляет
+# старые записи, чтобы таблица не пухла бесконечно (и давно просмотренные анкеты
+# со временем снова появлялись в ленте).
+
+# Сколько дней хранить просмотры. 0 или меньше — чистку не запускать.
+VIEWS_RETENTION_DAYS = _int_env("VIEWS_RETENTION_DAYS", 60)
+# Как часто прогонять чистку, часов.
+VIEWS_CLEANUP_INTERVAL_HOURS = _int_env("VIEWS_CLEANUP_INTERVAL_HOURS", 24)
+
+
 def get_statement_cache_size() -> int | None:
     """
     Размер кэша prepared statements asyncpg.
@@ -55,6 +66,22 @@ def get_statement_cache_size() -> int | None:
     """
     raw = os.getenv("DB_STATEMENT_CACHE_SIZE")
     return int(raw) if raw not in (None, "") else None
+
+
+def get_command_timeout() -> float | None:
+    """
+    Таймаут выполнения одного запроса asyncpg, в секундах (по умолчанию None —
+    без лимита, поведение не меняем).
+
+    Зачем под нагрузкой: пул маленький (DB_POOL_MAX_SIZE), и один зависший
+    запрос держит соединение, приближая исчерпание пула → отказ для всех.
+    Таймаут обрывает такой запрос и возвращает слот в пул.
+
+    Осторожно: слишком малое значение обрубит тяжёлые стартовые бэкфилл-миграции
+    на большой таблице. Ставь с запасом (напр. 30–60).
+    """
+    raw = os.getenv("DB_COMMAND_TIMEOUT")
+    return float(raw) if raw not in (None, "") else None
 
 
 # ====================== ПРЕМИУМ (Telegram Stars) ======================

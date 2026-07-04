@@ -134,3 +134,23 @@ async def register_like(
             to_id, from_id,
         )
         return bool(inserted), bool(reciprocal)
+
+
+async def delete_old_views(days: int) -> int:
+    """
+    Удалить просмотры старше `days` дней. Возвращает число удалённых строк.
+
+    Ограничивает рост таблицы views (растёт на каждый свайп). Повторный показ
+    давно просмотренных анкет — ожидаемое поведение: ситуация людей со временем
+    меняется. Лайки при этом НЕ трогаем, поэтому повторный лайк того же человека
+    не пере-уведомляет (register_like вернёт is_new=False).
+    """
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        status = await conn.execute(
+            "DELETE FROM views WHERE created_at < now() - make_interval(days => $1)",
+            days,
+        )
+    # asyncpg отдаёт тег команды вида "DELETE <n>"
+    parts = status.split()
+    return int(parts[1]) if len(parts) == 2 and parts[1].isdigit() else 0

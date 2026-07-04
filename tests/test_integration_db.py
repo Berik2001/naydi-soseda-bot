@@ -156,6 +156,38 @@ def test_register_like_flags_new_and_reciprocal():
     run(scenario)
 
 
+def test_delete_old_views_removes_only_stale():
+    async def scenario():
+        await users.upsert_user(_user(1, role="seeker"))
+        await users.upsert_user(_user(2, role="provider"))
+        async with db_pool.get_pool().acquire() as conn:
+            # Старый просмотр (100 дней назад) и свежий (сейчас)
+            await conn.execute(
+                "INSERT INTO views (viewer_id, viewed_id, created_at) "
+                "VALUES ($1, $2, now() - interval '100 days')", 1, 2)
+            await conn.execute(
+                "INSERT INTO views (viewer_id, viewed_id, created_at) "
+                "VALUES ($1, $2, now())", 1, 3)
+
+        deleted = await matching.delete_old_views(60)
+        assert deleted == 1                                        # удалён только старый
+
+        async with db_pool.get_pool().acquire() as conn:
+            remaining = await conn.fetchval("SELECT count(*) FROM views")
+        assert remaining == 1
+    run(scenario)
+
+
+def test_delete_old_views_none_stale_returns_zero():
+    async def scenario():
+        await users.upsert_user(_user(1, role="seeker"))
+        await users.upsert_user(_user(2, role="provider"))
+        await matching.add_view(1, 2)                              # свежий просмотр
+        deleted = await matching.delete_old_views(60)
+        assert deleted == 0                                        # чистить нечего
+    run(scenario)
+
+
 def test_who_liked_me_lists_active_likers():
     async def scenario():
         await users.upsert_user(_user(1, role="seeker"))

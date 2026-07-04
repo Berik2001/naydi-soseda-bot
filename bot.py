@@ -16,6 +16,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand, ErrorEvent
 
 import config
+from database.matching import delete_old_views
 from database.pool import close_pool, create_pool
 from handlers import matching, premium, registration, start
 from middlewares.throttling import ThrottlingMiddleware
@@ -104,6 +105,31 @@ async def set_commands(bot: Bot) -> None:
     await bot.set_my_commands(commands)
 
 
+async def _views_cleanup_loop() -> None:
+    """
+    Фоновая периодическая чистка старых просмотров (см. config.VIEWS_*).
+
+    Никогда не роняет бота: сбои логируются, цикл продолжается по расписанию.
+    Останавливается по отмене задачи (при остановке бота).
+    """
+    days = config.VIEWS_RETENTION_DAYS
+    interval = config.VIEWS_CLEANUP_INTERVAL_HOURS * 3600
+    try:
+        # Небольшая пауза перед первой чисткой — не конкурируем со стартом и миграциями.
+        await asyncio.sleep(60)
+        while True:
+            try:
+                deleted = await delete_old_views(days)
+                logger.info(
+                    "Чистка views: удалено %d записей старше %d дн.", deleted, days
+                )
+            except Exception:  # noqa: BLE001 — фоновая задача не должна падать
+                logger.exception("Сбой чистки views — продолжаю по расписанию.")
+            await asyncio.sleep(interval)
+    except asyncio.CancelledError:
+        pass
+
+
 async def main() -> None:
     # Наблюдаемость поднимаем первой — чтобы ловить и ошибки старта (БД и т.п.)
     init_sentry()
@@ -138,10 +164,19 @@ async def main() -> None:
 
     await set_commands(bot)
 
+    # Фоновая чистка старых просмотров (если включена).
+    cleanup_task = (
+        asyncio.create_task(_views_cleanup_loop())
+        if config.VIEWS_RETENTION_DAYS > 0
+        else None
+    )
+
     logger.info("Бот запущен. Ожидаю сообщения...")
     try:
         await dp.start_polling(bot)
     finally:
+        if cleanup_task is not None:
+            cleanup_task.cancel()
         await close_pool()
         await bot.session.close()
         logger.info("Бот остановлен, соединения закрыты.")

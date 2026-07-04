@@ -42,6 +42,16 @@ def test_int_env_fallback_and_parse(monkeypatch):
     assert config._int_env("DB_POOL_MAX_SIZE", 5) == 20
 
 
+# ---------------------- чистка просмотров ----------------------
+
+def test_views_cleanup_defaults_are_sane_ints():
+    # Дефолты по умолчанию (env не задан в тестах): хранение 60 дн, прогон раз в сутки.
+    assert isinstance(config.VIEWS_RETENTION_DAYS, int)
+    assert isinstance(config.VIEWS_CLEANUP_INTERVAL_HOURS, int)
+    assert config.VIEWS_RETENTION_DAYS == 60
+    assert config.VIEWS_CLEANUP_INTERVAL_HOURS == 24
+
+
 # ---------------------- наблюдаемость ----------------------
 
 def test_sentry_dsn_default_none(monkeypatch):

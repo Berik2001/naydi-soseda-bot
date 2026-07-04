@@ -45,6 +45,17 @@ DB_POOL_MIN_SIZE = _int_env("DB_POOL_MIN_SIZE", 1)
 DB_POOL_MAX_SIZE = _int_env("DB_POOL_MAX_SIZE", 5)
 
 
+# ====================== ЧИСТКА ПРОСМОТРОВ ======================
+# Таблица views растёт на каждый свайп. Фоновая задача периодически удаляет
+# старые записи, чтобы таблица не пухла бесконечно (и давно просмотренные анкеты
+# со временем снова появлялись в ленте).
+
+# Сколько дней хранить просмотры. 0 или меньше — чистку не запускать.
+VIEWS_RETENTION_DAYS = _int_env("VIEWS_RETENTION_DAYS", 60)
+# Как часто прогонять чистку, часов.
+VIEWS_CLEANUP_INTERVAL_HOURS = _int_env("VIEWS_CLEANUP_INTERVAL_HOURS", 24)
+
+
 def get_statement_cache_size() -> int | None:
     """
     Размер кэша prepared statements asyncpg.

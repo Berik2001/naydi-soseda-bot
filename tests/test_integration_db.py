@@ -134,6 +134,28 @@ def test_add_like_and_reciprocity():
     run(scenario)
 
 
+def test_register_like_flags_new_and_reciprocal():
+    async def scenario():
+        await users.upsert_user(_user(1, role="seeker"))
+        await users.upsert_user(_user(2, role="provider"))
+
+        # Первый лайк — новый, встречного ещё нет
+        is_new, reciprocal = await matching.register_like(1, 2)
+        assert is_new is True and reciprocal is False
+
+        # Повторный тот же лайк (напр. подделанный коллбэк) — НЕ новый → не спамим уведомлением
+        is_new, reciprocal = await matching.register_like(1, 2)
+        assert is_new is False
+
+        # Встречный лайк от 2 к 1 — теперь взаимно
+        is_new, reciprocal = await matching.register_like(2, 1)
+        assert is_new is True and reciprocal is True
+
+        # Просмотр проставился как побочный эффект
+        assert await matching.get_next_candidate(1) is None
+    run(scenario)
+
+
 def test_who_liked_me_lists_active_likers():
     async def scenario():
         await users.upsert_user(_user(1, role="seeker"))

@@ -23,7 +23,7 @@ from media_flow import (
     collect_profile_video,
 )
 from states.form import Edit
-from validators import is_valid_about, parse_budget
+from validators import clean_location, is_valid_about, parse_budget
 
 router = Router()
 
@@ -264,7 +264,7 @@ async def profile_city_set(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(Edit.waiting_loc_city, F.text)
 async def profile_city_text(message: Message, state: FSMContext) -> None:
-    city = message.text.strip()
+    city = clean_location(message.text)
     await update_field(message.from_user.id, "city", city)
     user = await get_user(message.from_user.id)
     role = user["role"] if user else None
@@ -275,7 +275,7 @@ async def profile_city_text(message: Message, state: FSMContext) -> None:
 
 @router.message(Edit.waiting_loc_district, F.text)
 async def profile_district_text(message: Message, state: FSMContext) -> None:
-    await update_field(message.from_user.id, "district", message.text.strip())
+    await update_field(message.from_user.id, "district", clean_location(message.text))
     await state.clear()
     await message.answer(texts.PROFILE_UPDATED)
     await show_updated_profile(message, message.from_user.id)
@@ -389,7 +389,7 @@ async def edit_text_set(message: Message, state: FSMContext) -> None:
             return
         value = text
     else:  # city, district
-        value = text
+        value = clean_location(text)
 
     await update_field(message.from_user.id, field, value)
     await state.clear()

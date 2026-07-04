@@ -18,6 +18,7 @@ from aiogram.types import BotCommand, ErrorEvent
 import config
 from database.pool import close_pool, create_pool
 from handlers import matching, premium, registration, start
+from middlewares.throttling import ThrottlingMiddleware
 
 logging.basicConfig(
     level=getattr(logging, config.get_log_level(), logging.INFO),
@@ -117,6 +118,10 @@ async def main() -> None:
 
     bot = Bot(token=bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher(storage=build_storage())
+
+    # Anti-flood: отсекает спам-апдейты до хендлеров, защищает пул БД.
+    # Регистрируем ПЕРВЫМ, чтобы отбраковка шла раньше любой другой логики.
+    dp.update.middleware(ThrottlingMiddleware())
 
     # Порядок важен: сначала роутеры с командами (start/matching/premium),
     # чтобы /profile, /start, /search и т.д. работали ДАЖЕ во время

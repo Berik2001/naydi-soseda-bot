@@ -14,11 +14,27 @@ from handlers.render import send_media_card, send_media_card_to_chat
 
 import cards
 import texts
-from database.matching import add_like, add_view, get_next_candidate, has_like
+from database.matching import add_view, get_next_candidate, register_like
 from database.users import get_user
 from keyboards import inline
 
 router = Router()
+
+
+def _parse_target_id(data: str | None) -> int | None:
+    """
+    Безопасно достать telegram_id из callback_data «<префикс>:<id>».
+
+    callback_data приходит от клиента и в самописном клиенте может быть любым:
+    поэтому не доверяем и парсим через try. None → коллбэк битый/подделанный,
+    хендлер просто тихо его гасит (int(...) раньше кидал ValueError → шум в логах).
+    """
+    if not data:
+        return None
+    try:
+        return int(data.split(":", 1)[1])
+    except (IndexError, ValueError):
+        return None
 
 
 # ====================== /search ======================
@@ -79,7 +95,10 @@ async def on_superlike(call: CallbackQuery, bot: Bot) -> None:
 @router.callback_query(F.data.startswith("pass:"))
 async def on_pass(call: CallbackQuery) -> None:
     """Пропустить кандидата — просто отмечаем как просмотренного."""
-    candidate_id = int(call.data.split(":", 1)[1])
+    candidate_id = _parse_target_id(call.data)
+    if candidate_id is None:
+        await call.answer()
+        return
     await add_view(call.from_user.id, candidate_id)
     await _remove_buttons(call)
     await call.answer(texts.SKIPPED)
@@ -89,15 +108,15 @@ async def on_pass(call: CallbackQuery) -> None:
 async def _process_like(call: CallbackQuery, bot: Bot, is_super: bool) -> None:
     """Общая логика лайка и супер-лайка + проверка взаимного мэтча."""
     viewer_id = call.from_user.id
-    candidate_id = int(call.data.split(":", 1)[1])
+    candidate_id = _parse_target_id(call.data)
+    if candidate_id is None:
+        await call.answer()
+        return
 
-    # Три независимые операции БД выполняем разом (одним round-trip вместо трёх):
-    # отметить просмотр, поставить лайк и проверить встречный лайк кандидата.
-    _, _, reciprocal = await asyncio.gather(
-        add_view(viewer_id, candidate_id),
-        add_like(viewer_id, candidate_id, is_super=is_super),
-        has_like(candidate_id, viewer_id),
-    )
+    # Просмотр + лайк + проверка встречного лайка — одним соединением пула.
+    # is_new=False, если лайк уже стоял (повторный или подделанный коллбэк):
+    # тогда НЕ шлём получателю новое уведомление — защита от спама.
+    is_new, reciprocal = await register_like(viewer_id, candidate_id, is_super=is_super)
 
     await _remove_buttons(call)
     await call.answer(texts.SUPERLIKE_SENT if is_super else texts.LIKE_SENT)
@@ -105,8 +124,8 @@ async def _process_like(call: CallbackQuery, bot: Bot, is_super: bool) -> None:
     if reciprocal:
         # Оба лайкнули друг друга → мэтч, шлём контакт обоим
         await _notify_match(bot, viewer_id, candidate_id)
-    else:
-        # Иначе сразу уведомляем кандидата: «тебя лайкнули» + его выбор
+    elif is_new:
+        # Только на ПЕРВЫЙ лайк уведомляем кандидата: «тебя лайкнули» + его выбор
         await _notify_incoming_like(bot, viewer_id, candidate_id, is_super)
 
     await _show_next(call.message, viewer_id)
@@ -135,10 +154,13 @@ async def _notify_incoming_like(bot: Bot, liker_id: int, target_id: int,
 @router.callback_query(F.data.startswith("accept:"))
 async def on_accept(call: CallbackQuery, bot: Bot) -> None:
     """«Перейти к переписке» — лайк в ответ, что даёт мэтч и контакт обоим."""
-    liker_id = int(call.data.split(":", 1)[1])
+    liker_id = _parse_target_id(call.data)
+    if liker_id is None:
+        await call.answer()
+        return
     me = call.from_user.id
-    await add_view(me, liker_id)
-    await add_like(me, liker_id, is_super=False)
+    # Просмотр + ответный лайк одним соединением; лайкнувший нас уже лайкнул → мэтч.
+    await register_like(me, liker_id, is_super=False)
     await _remove_buttons(call)
     await call.answer(texts.MATCH_ACCEPTED)
     await _notify_match(bot, me, liker_id)
@@ -147,7 +169,10 @@ async def on_accept(call: CallbackQuery, bot: Bot) -> None:
 @router.callback_query(F.data.startswith("decline:"))
 async def on_decline(call: CallbackQuery) -> None:
     """«Отказаться» — помечаем лайкнувшего просмотренным, больше не показываем."""
-    liker_id = int(call.data.split(":", 1)[1])
+    liker_id = _parse_target_id(call.data)
+    if liker_id is None:
+        await call.answer()
+        return
     await add_view(call.from_user.id, liker_id)
     await _remove_buttons(call)
     await call.answer(texts.MATCH_DECLINED)

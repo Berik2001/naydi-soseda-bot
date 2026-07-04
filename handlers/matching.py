@@ -4,8 +4,10 @@
 """
 
 import asyncio
+import logging
 
 from aiogram import Bot, F, Router
+from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -17,6 +19,9 @@ import texts
 from database.matching import add_view, get_next_candidate, register_like
 from database.users import get_user
 from keyboards import inline
+from tg_retry import with_flood_retry
+
+logger = logging.getLogger(__name__)
 
 router = Router()
 
@@ -140,13 +145,19 @@ async def _notify_incoming_like(bot: Bot, liker_id: int, target_id: int,
     header = texts.incoming_like_header(is_super)
     caption = f"{header}\n\n{cards.user_card(liker)}"
     try:
+        # Примитивы отправки внутри уже переживают флуд-лимит (см. render.py).
         await send_media_card_to_chat(
             bot, target_id, liker, caption,
             reply_markup=inline.incoming_like_kb(liker_id),
         )
-    except Exception:
-        # Получатель мог заблокировать бота / не начинал диалог — игнорируем
+    except TelegramForbiddenError:
+        # Получатель заблокировал бота / не начинал диалог — ожидаемо, молча.
         pass
+    except TelegramRetryAfter:
+        # Флуд-лимит не переждан за отведённые попытки — уведомление потеряно.
+        logger.warning("Уведомление о лайке не доставлено %s: флуд-лимит Telegram.", target_id)
+    except Exception:
+        logger.exception("Сбой доставки уведомления о лайке %s.", target_id)
 
 
 # ====================== ВХОДЯЩИЙ ЛАЙК: ПРИНЯТЬ / ОТКАЗАТЬСЯ ======================
@@ -186,17 +197,27 @@ async def _notify_match(bot: Bot, user_a: int, user_b: int) -> None:
         return
 
     # Пишем каждому контакт другого (имя — кликабельная ссылка на профиль).
-    # Доставка best-effort: если один заблокировал бота, второй всё равно
-    # получает уведомление (return_exceptions гасит ошибку отправки).
+    # Доставка обоим независима и best-effort: блокировка/сбой у одного не мешает
+    # другому, а флуд-лимит Telegram (429) переживаем повтором (см. _deliver_match).
     await asyncio.gather(
-        bot.send_message(
-            user_a, cards.match_message(b["full_name"], b["username"], b["telegram_id"])
-        ),
-        bot.send_message(
-            user_b, cards.match_message(a["full_name"], a["username"], a["telegram_id"])
-        ),
-        return_exceptions=True,
+        _deliver_match(bot, user_a, b),
+        _deliver_match(bot, user_b, a),
     )
+
+
+async def _deliver_match(bot: Bot, chat_id: int, other) -> None:
+    """Доставить одному участнику контакт другого, переживая флуд-лимит."""
+    text = cards.match_message(other["full_name"], other["username"], other["telegram_id"])
+    try:
+        await with_flood_retry(lambda: bot.send_message(chat_id, text))
+    except TelegramForbiddenError:
+        # Заблокировал бота / не начинал диалог — ожидаемо, молча.
+        pass
+    except TelegramRetryAfter:
+        # Не переждали флуд-лимит за отведённые попытки — уведомление о мэтче потеряно.
+        logger.warning("Уведомление о мэтче не доставлено %s: флуд-лимит Telegram.", chat_id)
+    except Exception:
+        logger.exception("Сбой доставки уведомления о мэтче %s.", chat_id)
 
 
 async def _remove_buttons(call: CallbackQuery) -> None:

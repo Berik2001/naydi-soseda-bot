@@ -52,6 +52,16 @@ def test_views_cleanup_defaults_are_sane_ints():
     assert config.VIEWS_CLEANUP_INTERVAL_HOURS == 24
 
 
+# ---------------------- премиум и лимит лайков ----------------------
+
+def test_premium_price_is_50_stars():
+    assert config.PREMIUM_STARS == 50
+
+
+def test_free_daily_likes_default_100():
+    assert config.FREE_DAILY_LIKES == 100
+
+
 # ---------------------- наблюдаемость ----------------------
 
 def test_sentry_dsn_default_none(monkeypatch):

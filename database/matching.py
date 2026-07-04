@@ -136,6 +136,34 @@ async def register_like(
         return bool(inserted), bool(reciprocal)
 
 
+async def like_usage(from_id: int, hours: int = 24) -> tuple[bool, int]:
+    """
+    Вернуть (премиум?, сколько лайков поставлено за последние `hours` часов) —
+    одним заходом в пул. Для дневного лимита лайков.
+
+    Считаем строки likes (одна на каждого лайкнутого; повторный лайк не создаёт
+    новую строку — лента исключает уже просмотренных). Фильтр по from_id покрыт
+    UNIQUE(from_id, to_id).
+    """
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT
+              COALESCE(
+                (SELECT premium_until IS NOT NULL AND premium_until > now()
+                   FROM users WHERE telegram_id = $1),
+                FALSE
+              ) AS is_prem,
+              (SELECT count(*) FROM likes
+                 WHERE from_id = $1
+                   AND created_at > now() - make_interval(hours => $2)) AS used
+            """,
+            from_id, hours,
+        )
+        return bool(row["is_prem"]), int(row["used"])
+
+
 async def delete_old_views(days: int) -> int:
     """
     Удалить просмотры старше `days` дней. Возвращает число удалённых строк.

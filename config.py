@@ -142,3 +142,30 @@ def get_log_level() -> str:
 def get_environment() -> str:
     """Окружение для тегирования событий Sentry (production по умолчанию)."""
     return os.getenv("ENVIRONMENT") or os.getenv("RAILWAY_ENVIRONMENT") or "production"
+
+
+# ====================== АДМИНИСТРАТОРЫ ======================
+
+# ID владельца — дефолт, если не задан ADMIN_IDS (чтобы админка работала «из коробки»).
+_DEFAULT_ADMIN_ID = 8459204194
+
+
+def get_admin_ids() -> set[int]:
+    """
+    Telegram ID администраторов (доступ к /admin, /stats).
+
+    Берём из env ADMIN_IDS (через запятую, напр. "111,222"). Если не задан —
+    один владелец по умолчанию. Кривые значения игнорируем, чтобы опечатка в env
+    не роняла старт.
+    """
+    raw = os.getenv("ADMIN_IDS")
+    if not raw:
+        return {_DEFAULT_ADMIN_ID}
+    ids: set[int] = set()
+    for part in raw.replace(" ", "").split(","):
+        if part:
+            try:
+                ids.add(int(part))
+            except ValueError:
+                continue
+    return ids or {_DEFAULT_ADMIN_ID}

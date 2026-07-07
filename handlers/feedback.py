@@ -57,11 +57,24 @@ def _remember(user_id: int, now: float) -> None:
 
 # ====================== /feedback ======================
 
-@router.message(Command("feedback"))
-async def cmd_feedback(message: Message, state: FSMContext) -> None:
-    """Начать обратную связь: перевести в состояние ожидания текста."""
+async def _start_feedback(message: Message, state: FSMContext) -> None:
+    """Перевести в состояние обратной связи и показать приглашение (общий вход
+    для команды /feedback и кнопки «Написать в поддержку» из меню анкеты)."""
     await state.set_state(Feedback.waiting)
     await message.answer(texts.FEEDBACK_ASK, reply_markup=inline.feedback_cancel_kb())
+
+
+@router.message(Command("feedback"))
+async def cmd_feedback(message: Message, state: FSMContext) -> None:
+    """Начать обратную связь по команде /feedback."""
+    await _start_feedback(message, state)
+
+
+@router.callback_query(F.data == "feedback:start")
+async def feedback_start(call: CallbackQuery, state: FSMContext) -> None:
+    """Начать обратную связь по кнопке «Написать в поддержку» из меню анкеты."""
+    await _start_feedback(call.message, state)
+    await call.answer()
 
 
 @router.callback_query(Feedback.waiting, F.data == "feedback:cancel")

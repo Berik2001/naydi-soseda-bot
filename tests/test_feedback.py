@@ -136,6 +136,14 @@ def test_cooldown_blocks_second_then_allows(clock):
     assert len(bot3.sent) == 2                             # снова доставлено
 
 
+def test_profile_menu_has_support_button():
+    from keyboards import inline
+    for role in ("seeker", "provider", None):
+        kb = inline.profile_menu_kb(role)
+        cbs = {b.callback_data for row in kb.inline_keyboard for b in row}
+        assert "feedback:start" in cbs, role   # кнопка «Написать в поддержку» есть
+
+
 def test_cooldown_is_per_user(clock):
     _run(feedback.feedback_receive(_Msg(5, "a", _Bot()), _State()))
     bot = _Bot()

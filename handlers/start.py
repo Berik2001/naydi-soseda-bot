@@ -87,6 +87,22 @@ async def show_updated_profile(message: Message, telegram_id: int) -> None:
     await send_full_card(message, user, reply_markup=inline.profile_menu_kb(user["role"]))
 
 
+async def _cancel_media_edit(call: CallbackQuery, state: FSMContext) -> None:
+    """
+    Выйти из редактирования фото по кнопке «Пропустить», оставив ТЕКУЩЕЕ фото без
+    изменений, и вернуть пользователя к анкете. Общий выход для обоих потоков
+    (фото профиля и фото квартиры) — без него edit-режим был тупиком.
+    """
+    cancel_done_button(call.message.chat.id)  # снять отложенную «плавающую» кнопку
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:  # noqa: BLE001 — сообщение старое/уже без кнопки
+        pass
+    await state.clear()
+    await call.answer()
+    await show_updated_profile(call.message, call.from_user.id)
+
+
 # ---------- Пункты меню «Моя анкета» ----------
 
 @router.callback_query(F.data == "profile:feed")
@@ -142,7 +158,10 @@ async def profile_about(call: CallbackQuery, state: FSMContext) -> None:
 async def profile_apt_photos(call: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(Edit.waiting_apartment_photos)
     await state.update_data(apt_photos=[], done_msg_id=None)
-    await call.message.answer(texts.ASK_APARTMENT_PHOTOS)
+    # Кнопка выхода: без неё пользователь, передумавший менять фото, застревал.
+    await call.message.answer(
+        texts.ASK_APARTMENT_PHOTOS, reply_markup=inline.photo_skip_kb("aptphoto:editcancel")
+    )
     await call.answer()
 
 
@@ -174,6 +193,12 @@ async def edit_apt_photos_done(call: CallbackQuery, state: FSMContext) -> None:
     await show_updated_profile(call.message, call.from_user.id)
 
 
+@router.callback_query(Edit.waiting_apartment_photos, F.data == "aptphoto:editcancel")
+async def edit_apt_photos_cancel(call: CallbackQuery, state: FSMContext) -> None:
+    """«Пропустить» при изменении фото квартиры — оставить текущие, вернуться к анкете."""
+    await _cancel_media_edit(call, state)
+
+
 @router.message(Edit.waiting_apartment_photos)
 async def edit_apt_photos_wrong(message: Message) -> None:
     await message.answer(texts.ASK_APARTMENT_PHOTOS)
@@ -185,7 +210,10 @@ async def edit_apt_photos_wrong(message: Message) -> None:
 async def profile_photo(call: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(Edit.waiting_photo)
     await state.update_data(new_media=[], new_media_type=None, done_msg_id=None)
-    await call.message.answer(texts.ASK_PHOTO)
+    # Кнопка выхода: без неё пользователь, передумавший менять фото, застревал.
+    await call.message.answer(
+        texts.ASK_PHOTO, reply_markup=inline.photo_skip_kb("photo:editcancel")
+    )
     await call.answer()
 
 
@@ -225,6 +253,12 @@ async def profile_media_done(call: CallbackQuery, state: FSMContext) -> None:
     await call.message.answer(texts.PHOTO_UPDATED)
     await call.answer()
     await show_updated_profile(call.message, call.from_user.id)
+
+
+@router.callback_query(Edit.waiting_photo, F.data == "photo:editcancel")
+async def profile_photo_edit_cancel(call: CallbackQuery, state: FSMContext) -> None:
+    """«Пропустить» при изменении фото профиля — оставить текущее, вернуться к анкете."""
+    await _cancel_media_edit(call, state)
 
 
 @router.message(Edit.waiting_photo)

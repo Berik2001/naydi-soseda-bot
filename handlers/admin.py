@@ -16,11 +16,12 @@ from __future__ import annotations
 import html
 
 from aiogram import Router
-from aiogram.filters import BaseFilter, Command
+from aiogram.filters import BaseFilter, Command, CommandObject
 from aiogram.types import Message
 
 import config
 from database.stats import get_overview, top_cities
+from database.users import delete_user, get_user
 
 router = Router()
 
@@ -40,7 +41,9 @@ router.message.filter(IsAdmin())
 ADMIN_HELP = (
     "🛠 <b>Админ-панель</b>\n\n"
     "/stats — статистика бота\n"
-    "/admin — это меню"
+    "/delete &lt;id&gt; — удалить анкету по Telegram ID\n"
+    "/admin — это меню\n\n"
+    "💡 Ещё удалять объявления можно кнопкой «🗑 Удалить» прямо в ленте (/search)."
 )
 
 
@@ -48,6 +51,30 @@ ADMIN_HELP = (
 async def cmd_admin(message: Message) -> None:
     """Меню админ-команд."""
     await message.answer(ADMIN_HELP)
+
+
+@router.message(Command("delete"))
+async def cmd_delete(message: Message, command: CommandObject) -> None:
+    """Удалить анкету по Telegram ID: /delete 12345 (модерация)."""
+    raw = (command.args or "").strip()
+    if not raw:
+        await message.answer("Формат: <code>/delete &lt;telegram_id&gt;</code>")
+        return
+    try:
+        target = int(raw.split()[0])
+    except ValueError:
+        await message.answer("ID должен быть числом. Пример: <code>/delete 12345</code>")
+        return
+
+    user = await get_user(target)
+    if user is None:
+        await message.answer(f"Анкета с ID <code>{target}</code> не найдена.")
+        return
+
+    await delete_user(target)
+    name = html.escape(user["full_name"] or "без имени")
+    city = html.escape(user["city"] or "—")
+    await message.answer(f"🗑 Удалена анкета: <b>{name}</b> ({city}), ID <code>{target}</code>.")
 
 
 @router.message(Command("stats"))

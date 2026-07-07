@@ -20,7 +20,7 @@ import cards
 import config
 import texts
 from database.matching import add_view, get_next_candidate, like_usage, register_like
-from database.users import get_user
+from database.users import delete_user, get_user
 from keyboards import inline
 from tg_retry import with_flood_retry
 
@@ -70,12 +70,16 @@ async def start_search(message: Message, viewer) -> None:
     if candidate is None:
         await message.answer(texts.SEARCH_EMPTY)
         return
-    await _send_candidate(message, candidate)
+    await _send_candidate(message, candidate, viewer["telegram_id"])
 
 
-async def _send_candidate(message: Message, candidate) -> None:
-    """Показать карточку кандидата с кнопками действий (через общий рендер)."""
-    kb = inline.match_kb(candidate["telegram_id"])
+async def _send_candidate(message: Message, candidate, viewer_id: int) -> None:
+    """Показать карточку кандидата с кнопками действий (через общий рендер).
+
+    Админам добавляется модераторская кнопка «🗑 Удалить» (см. match_kb).
+    """
+    is_admin = viewer_id in config.get_admin_ids()
+    kb = inline.match_kb(candidate["telegram_id"], is_admin=is_admin)
     await send_media_card(message, candidate, cards.user_card(candidate), reply_markup=kb)
 
 
@@ -85,7 +89,7 @@ async def _show_next(message: Message, viewer_id: int) -> None:
     if candidate is None:
         await message.answer(texts.SEARCH_END)
         return
-    await _send_candidate(message, candidate)
+    await _send_candidate(message, candidate, viewer_id)
 
 
 # ====================== ЛАЙК / СУПЕР-ЛАЙК / ПРОПУСК ======================
@@ -202,6 +206,71 @@ async def on_decline(call: CallbackQuery) -> None:
     # Ленивый импорт разрывает цикл импорта (start импортирует matching).
     from handlers.start import show_updated_profile
     await show_updated_profile(call.message, call.from_user.id)
+
+
+# ====================== АДМИН: УДАЛЕНИЕ ОБЪЯВЛЕНИЯ ======================
+# Кнопка «🗑 Удалить» показывается на карточке только админам (см. match_kb).
+# Каждый колбэк перепроверяет права: даже подделанный admindel:* от не-админа
+# ничего не удалит.
+
+def _is_admin(user_id: int) -> bool:
+    return user_id in config.get_admin_ids()
+
+
+@router.callback_query(F.data.startswith("admindel:"))
+async def on_admin_delete(call: CallbackQuery) -> None:
+    """«🗑 Удалить» — показать подтверждение (защита от случайного тапа)."""
+    if not _is_admin(call.from_user.id):
+        await call.answer()
+        return
+    target = _parse_target_id(call.data)
+    if target is None:
+        await call.answer()
+        return
+    try:
+        await call.message.edit_reply_markup(
+            reply_markup=inline.admin_delete_confirm_kb(target)
+        )
+    except Exception:  # noqa: BLE001 — сообщение старое/без кнопок
+        pass
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("admindelok:"))
+async def on_admin_delete_ok(call: CallbackQuery) -> None:
+    """Подтверждение: удалить анкету/объявление и показать следующего."""
+    if not _is_admin(call.from_user.id):
+        await call.answer()
+        return
+    target = _parse_target_id(call.data)
+    if target is None:
+        await call.answer()
+        return
+    deleted = await delete_user(target)
+    logger.info("Админ %s удалил анкету %s (найдена=%s).",
+                call.from_user.id, target, deleted)
+    await _remove_buttons(call)
+    await call.answer("🗑 Удалено" if deleted else "Анкета уже удалена", show_alert=not deleted)
+    await _show_next(call.message, call.from_user.id)
+
+
+@router.callback_query(F.data.startswith("admindelno:"))
+async def on_admin_delete_cancel(call: CallbackQuery) -> None:
+    """Отмена: вернуть обычные кнопки карточки (с админ-кнопкой)."""
+    if not _is_admin(call.from_user.id):
+        await call.answer()
+        return
+    target = _parse_target_id(call.data)
+    if target is None:
+        await call.answer()
+        return
+    try:
+        await call.message.edit_reply_markup(
+            reply_markup=inline.match_kb(target, is_admin=True)
+        )
+    except Exception:  # noqa: BLE001
+        pass
+    await call.answer()
 
 
 async def _notify_match(bot: Bot, user_a: int, user_b: int) -> None:

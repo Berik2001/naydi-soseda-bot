@@ -54,16 +54,32 @@ def photo_skip_kb(action: str) -> InlineKeyboardMarkup:
 
 # ====================== МЭТЧИНГ ======================
 
-def match_kb(candidate_id: int) -> InlineKeyboardMarkup:
+def match_kb(candidate_id: int, is_admin: bool = False) -> InlineKeyboardMarkup:
     """Кнопки под карточкой кандидата.
 
     Супер-лайк временно скрыт: кнопку убрали, но обработчик super: в
     handlers/matching.py оставлен — вернуть фичу можно одной строкой (добавить
     кнопку обратно и поправить adjust).
+
+    is_admin=True добавляет модераторскую кнопку «🗑 Удалить» (видна только
+    админам) — удаление объявления/анкеты прямо из ленты.
     """
     builder = InlineKeyboardBuilder()
     builder.button(text="❤️ Интересно", callback_data=f"like:{candidate_id}")
     builder.button(text="👎 Пропустить", callback_data=f"pass:{candidate_id}")
+    if is_admin:
+        builder.button(text="🗑 Удалить (админ)", callback_data=f"admindel:{candidate_id}")
+        builder.adjust(2, 1)
+    else:
+        builder.adjust(2)
+    return builder.as_markup()
+
+
+def admin_delete_confirm_kb(candidate_id: int) -> InlineKeyboardMarkup:
+    """Подтверждение удаления объявления админом (защита от случайного тапа)."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✅ Да, удалить", callback_data=f"admindelok:{candidate_id}")
+    builder.button(text="✖️ Отмена", callback_data=f"admindelno:{candidate_id}")
     builder.adjust(2)
     return builder.as_markup()
 

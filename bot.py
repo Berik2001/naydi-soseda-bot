@@ -18,7 +18,7 @@ from aiogram.types import BotCommand, BotCommandScopeChat, ErrorEvent
 import config
 from database.matching import delete_old_views
 from database.pool import close_pool, create_pool
-from handlers import admin, matching, premium, registration, start
+from handlers import admin, feedback, matching, premium, registration, start
 from middlewares.throttling import ThrottlingMiddleware
 
 logging.basicConfig(
@@ -176,6 +176,9 @@ async def main() -> None:
     dp.include_router(start.router)
     dp.include_router(matching.router)
     dp.include_router(premium.router)
+    # Обратная связь — после командных роутеров (чтобы команды во время шага
+    # /feedback перехватывались первыми), но до регистрации.
+    dp.include_router(feedback.router)
     dp.include_router(registration.router)
 
     # Глобальный перехват ошибок хендлеров (логирование + не роняем polling)

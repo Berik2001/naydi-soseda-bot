@@ -173,3 +173,12 @@ def edit_choice_kb(field: str, options: dict) -> InlineKeyboardMarkup:
         builder.button(text=label, callback_data=f"setedit:{field}:{key}")
     builder.adjust(2)
     return builder.as_markup()
+
+
+# ====================== ОБРАТНАЯ СВЯЗЬ ======================
+
+def feedback_cancel_kb() -> InlineKeyboardMarkup:
+    """Кнопка отмены на шаге обратной связи (/feedback)."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Отмена ✖️", callback_data="feedback:cancel")
+    return builder.as_markup()

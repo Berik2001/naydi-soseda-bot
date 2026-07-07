@@ -99,6 +99,12 @@ PREMIUM_PAYLOAD = "premium_30d"  # идентификатор товара в pa
 FREE_DAILY_LIKES = _int_env("FREE_DAILY_LIKES", 100)
 
 
+# ====================== ОБРАТНАЯ СВЯЗЬ ======================
+# Пользователь пишет создателю бота через /feedback — сообщение уходит админам.
+FEEDBACK_MAX_LEN = 2000                                        # макс. длина сообщения
+FEEDBACK_COOLDOWN_SEC = _int_env("FEEDBACK_COOLDOWN_SEC", 30)  # антиспам-пауза между сообщениями
+
+
 # ====================== СЕКРЕТЫ ИЗ ОКРУЖЕНИЯ ======================
 
 def get_bot_token() -> str:

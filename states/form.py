@@ -28,3 +28,8 @@ class Edit(StatesGroup):
     waiting_apartment_photos = State()  # пересбор фото квартиры (сдаю)
     waiting_loc_city = State()      # ждём текстовый ввод города (через меню анкеты)
     waiting_loc_district = State()  # ждём текстовый ввод района (через меню анкеты)
+
+
+class Feedback(StatesGroup):
+    """Обратная связь: пользователь пишет сообщение создателю бота (/feedback)."""
+    waiting = State()               # ждём текст сообщения

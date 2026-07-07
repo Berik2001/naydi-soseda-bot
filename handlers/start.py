@@ -87,6 +87,12 @@ async def show_updated_profile(message: Message, telegram_id: int) -> None:
     await send_full_card(message, user, reply_markup=inline.profile_menu_kb(user["role"]))
 
 
+def _media_skip_label(has_media: bool) -> str:
+    """Надпись кнопки выхода на шаге фото при редактировании: есть фото →
+    «Оставить текущее», нет → «Пропустить»."""
+    return texts.BTN_KEEP_CURRENT if has_media else texts.BTN_SKIP
+
+
 async def _cancel_media_edit(call: CallbackQuery, state: FSMContext) -> None:
     """
     Выйти из редактирования фото по кнопке «Пропустить», оставив ТЕКУЩЕЕ фото без
@@ -156,11 +162,14 @@ async def profile_about(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == "profile:apt_photos")
 async def profile_apt_photos(call: CallbackQuery, state: FSMContext) -> None:
+    user = await get_user(call.from_user.id)
+    has_photos = bool(user and user["apartment_photos"])
     await state.set_state(Edit.waiting_apartment_photos)
     await state.update_data(apt_photos=[], done_msg_id=None)
-    # Кнопка выхода: без неё пользователь, передумавший менять фото, застревал.
+    # Кнопка выхода: надпись зависит от того, есть ли уже фото квартиры.
     await call.message.answer(
-        texts.ASK_APARTMENT_PHOTOS, reply_markup=inline.photo_skip_kb("aptphoto:editcancel")
+        texts.ASK_APARTMENT_PHOTOS,
+        reply_markup=inline.photo_skip_kb("aptphoto:editcancel", _media_skip_label(has_photos)),
     )
     await call.answer()
 
@@ -208,11 +217,14 @@ async def edit_apt_photos_wrong(message: Message) -> None:
 
 @router.callback_query(F.data == "profile:photo")
 async def profile_photo(call: CallbackQuery, state: FSMContext) -> None:
+    user = await get_user(call.from_user.id)
+    has_media = bool(user and (user["profile_media"] or user["photo_file_id"]))
     await state.set_state(Edit.waiting_photo)
     await state.update_data(new_media=[], new_media_type=None, done_msg_id=None)
-    # Кнопка выхода: без неё пользователь, передумавший менять фото, застревал.
+    # Кнопка выхода: надпись зависит от того, есть ли уже фото/видео профиля.
     await call.message.answer(
-        texts.ASK_PHOTO, reply_markup=inline.photo_skip_kb("photo:editcancel")
+        texts.ASK_PHOTO,
+        reply_markup=inline.photo_skip_kb("photo:editcancel", _media_skip_label(has_media)),
     )
     await call.answer()
 

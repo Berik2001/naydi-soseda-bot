@@ -20,7 +20,7 @@ pytest.importorskip("asyncpg")
 DSN = os.getenv("TEST_DATABASE_URL")
 pytestmark = pytest.mark.skipif(not DSN, reason="TEST_DATABASE_URL не задан")
 
-from database import matching, pool as db_pool, premium, users  # noqa: E402
+from database import matching, pool as db_pool, premium, stats, users  # noqa: E402
 
 
 def run(scenario):
@@ -216,6 +216,31 @@ def test_like_usage_ignores_old_likes():
                 "VALUES ($1, $2, now() - interval '2 days')", 1, 2)
         _, used = await matching.like_usage(1)
         assert used == 0                                           # старые (>24ч) не в счёт
+    run(scenario)
+
+
+def test_stats_overview_and_matches():
+    async def scenario():
+        await users.upsert_user(_user(1, role="seeker"))
+        await users.upsert_user(_user(2, role="provider"))
+        await users.upsert_user(_user(3, role="provider", city="Астана"))
+        await premium.activate_premium(3, 30)
+        # взаимный лайк 1<->2 → один мэтч
+        await matching.register_like(1, 2)
+        await matching.register_like(2, 1)
+
+        o = await stats.get_overview()
+        assert o["total"] == 3
+        assert o["seekers"] == 1
+        assert o["providers"] == 2
+        assert o["premium"] == 1
+        assert o["likes"] == 2
+        assert o["matches"] == 1                                   # пара учтена один раз
+
+        cities = await stats.top_cities()
+        by_city = {r["city"]: r["n"] for r in cities}
+        assert by_city.get("Алматы") == 2                          # 1 и 2 в Алматы
+        assert by_city.get("Астана") == 1
     run(scenario)
 
 

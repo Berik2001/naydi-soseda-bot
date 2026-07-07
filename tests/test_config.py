@@ -62,6 +62,28 @@ def test_free_daily_likes_default_100():
     assert config.FREE_DAILY_LIKES == 100
 
 
+# ---------------------- админы ----------------------
+
+def test_admin_ids_default_owner(monkeypatch):
+    monkeypatch.delenv("ADMIN_IDS", raising=False)
+    assert config.get_admin_ids() == {8459204194}
+
+
+def test_admin_ids_parsed_from_env(monkeypatch):
+    monkeypatch.setenv("ADMIN_IDS", "111, 222 ,333")
+    assert config.get_admin_ids() == {111, 222, 333}
+
+
+def test_admin_ids_ignores_garbage(monkeypatch):
+    monkeypatch.setenv("ADMIN_IDS", "111,abc,,222")
+    assert config.get_admin_ids() == {111, 222}
+
+
+def test_admin_ids_empty_falls_back_to_owner(monkeypatch):
+    monkeypatch.setenv("ADMIN_IDS", "   ")
+    assert config.get_admin_ids() == {8459204194}
+
+
 # ---------------------- наблюдаемость ----------------------
 
 def test_sentry_dsn_default_none(monkeypatch):

@@ -13,12 +13,12 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.base import BaseStorage
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import BotCommand, ErrorEvent
+from aiogram.types import BotCommand, BotCommandScopeChat, ErrorEvent
 
 import config
 from database.matching import delete_old_views
 from database.pool import close_pool, create_pool
-from handlers import matching, premium, registration, start
+from handlers import admin, matching, premium, registration, start
 from middlewares.throttling import ThrottlingMiddleware
 
 logging.basicConfig(
@@ -104,6 +104,22 @@ async def set_commands(bot: Bot) -> None:
     ]
     await bot.set_my_commands(commands)
 
+    # Персональное меню для админов: в их чате показываем и админ-команды.
+    # Scope-команды не мешают обычным пользователям. Ошибку (админ не начинал
+    # диалог с ботом) гасим — она не должна ронять старт.
+    admin_commands = [
+        BotCommand(command="profile", description="Моя анкета"),
+        BotCommand(command="stats", description="📊 Статистика"),
+        BotCommand(command="admin", description="🛠 Админ-меню"),
+    ]
+    for admin_id in config.get_admin_ids():
+        try:
+            await bot.set_my_commands(
+                admin_commands, scope=BotCommandScopeChat(chat_id=admin_id)
+            )
+        except Exception as exc:  # noqa: BLE001 — наблюдаемость, но не падаем
+            logger.warning("Не удалось задать админ-меню для %s: %s", admin_id, exc)
+
 
 async def _views_cleanup_loop() -> None:
     """
@@ -154,6 +170,9 @@ async def main() -> None:
     # регистрации. Иначе FSM-хендлеры регистрации перехватывают команды как
     # «неверный ввод». Регистрация — последней: её обработчики привязаны к
     # состояниям Form.* и ловят только «свои» сообщения.
+    # Админ-роутер — первым: его команды (/admin, /stats) должны срабатывать даже
+    # во время незавершённой регистрации, как и остальные команды.
+    dp.include_router(admin.router)
     dp.include_router(start.router)
     dp.include_router(matching.router)
     dp.include_router(premium.router)

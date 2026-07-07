@@ -45,10 +45,14 @@ def city_kb() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def photo_skip_kb(action: str) -> InlineKeyboardMarkup:
-    """Кнопка «Пропустить» на шаге фото (фото необязательны). action — callback."""
+def photo_skip_kb(action: str, label: str = "Пропустить ➡️") -> InlineKeyboardMarkup:
+    """Кнопка выхода на шаге фото. action — callback; label — надпись.
+
+    По умолчанию «Пропустить ➡️» (регистрация, фото ещё нет). В редактировании
+    надпись меняют на «Оставить текущее», если фото у пользователя уже есть.
+    """
     builder = InlineKeyboardBuilder()
-    builder.button(text="Пропустить ➡️", callback_data=action)
+    builder.button(text=label, callback_data=action)
     return builder.as_markup()
 
 

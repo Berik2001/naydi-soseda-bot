@@ -244,6 +244,28 @@ def test_stats_overview_and_matches():
     run(scenario)
 
 
+def test_delete_user_removes_profile_and_relations():
+    async def scenario():
+        await users.upsert_user(_user(1, role="seeker"))
+        await users.upsert_user(_user(2, role="provider"))
+        await matching.register_like(1, 2)                          # лайк + просмотр от 1
+        await matching.register_like(2, 1)                          # встречный от 2
+
+        assert await users.delete_user(1) is True
+        assert await users.get_user(1) is None                     # анкета удалена
+
+        async with db_pool.get_pool().acquire() as conn:
+            likes = await conn.fetchval(
+                "SELECT count(*) FROM likes WHERE from_id = 1 OR to_id = 1")
+            views = await conn.fetchval(
+                "SELECT count(*) FROM views WHERE viewer_id = 1 OR viewed_id = 1")
+        assert likes == 0 and views == 0                           # связи вычищены
+
+        assert await users.delete_user(1) is False                 # повторно — нечего
+        assert await users.get_user(2) is not None                 # второй не задет
+    run(scenario)
+
+
 def test_who_liked_me_lists_active_likers():
     async def scenario():
         await users.upsert_user(_user(1, role="seeker"))

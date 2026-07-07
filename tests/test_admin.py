@@ -59,3 +59,20 @@ def test_format_stats_escapes_city_html():
     cities = [{"city": "<b>hack</b>", "n": 1}]
     text = _format_stats(overview, cities)
     assert "&lt;b&gt;hack&lt;/b&gt;" in text  # экранировано, не сырой HTML
+
+
+def test_match_kb_shows_delete_only_for_admin():
+    from keyboards import inline
+    admin_cbs = {b.callback_data
+                 for row in inline.match_kb(5, is_admin=True).inline_keyboard for b in row}
+    assert "admindel:5" in admin_cbs                    # админ видит кнопку удаления
+    plain_cbs = {b.callback_data
+                 for row in inline.match_kb(5).inline_keyboard for b in row}
+    assert "admindel:5" not in plain_cbs                # обычный пользователь — нет
+
+
+def test_admin_delete_confirm_kb_has_both_choices():
+    from keyboards import inline
+    cbs = {b.callback_data
+           for row in inline.admin_delete_confirm_kb(7).inline_keyboard for b in row}
+    assert cbs == {"admindelok:7", "admindelno:7"}

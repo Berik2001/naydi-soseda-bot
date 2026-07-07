@@ -93,6 +93,30 @@ async def update_field(telegram_id: int, field: str, value) -> None:
         )
 
 
+async def delete_user(telegram_id: int) -> bool:
+    """
+    Полностью удалить анкету пользователя вместе со связанными лайками и
+    просмотрами (модерация: снять объявление/анкету). Всё в одной транзакции —
+    либо удаляется всё, либо ничего.
+
+    Возвращает True, если анкета существовала и удалена; False — если её не было.
+    """
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            await conn.execute(
+                "DELETE FROM likes WHERE from_id = $1 OR to_id = $1", telegram_id
+            )
+            await conn.execute(
+                "DELETE FROM views WHERE viewer_id = $1 OR viewed_id = $1", telegram_id
+            )
+            status = await conn.execute(
+                "DELETE FROM users WHERE telegram_id = $1", telegram_id
+            )
+    # asyncpg возвращает строку вида "DELETE <n>" — берём число удалённых анкет.
+    return status.rsplit(" ", 1)[-1] != "0"
+
+
 async def set_active(telegram_id: int, active: bool) -> None:
     """Поставить анкету на паузу / снять с паузы."""
     pool = get_pool()

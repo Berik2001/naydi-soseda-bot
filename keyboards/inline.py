@@ -98,6 +98,8 @@ def profile_menu_kb(role: str | None) -> InlineKeyboardMarkup:
     # У сдающего это текст объявления, у ищущего — «о себе»
     about_label = "✍️ Изменить текст объявления" if role == "provider" else "✍️ Изменить о себе"
     builder.button(text=about_label, callback_data="profile:about")
+    # Написать создателю бота (обратная связь) — запускает flow /feedback
+    builder.button(text="✉️ Написать в поддержку", callback_data="feedback:start")
     # Кнопка премиума временно скрыта (пока премиум бесплатный)
     builder.adjust(1)
     return builder.as_markup()
@@ -172,4 +174,13 @@ def edit_choice_kb(field: str, options: dict) -> InlineKeyboardMarkup:
     for key, label in options.items():
         builder.button(text=label, callback_data=f"setedit:{field}:{key}")
     builder.adjust(2)
+    return builder.as_markup()
+
+
+# ====================== ОБРАТНАЯ СВЯЗЬ ======================
+
+def feedback_cancel_kb() -> InlineKeyboardMarkup:
+    """Кнопка отмены на шаге обратной связи (/feedback)."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Отмена ✖️", callback_data="feedback:cancel")
     return builder.as_markup()
